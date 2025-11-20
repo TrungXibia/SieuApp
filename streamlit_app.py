@@ -157,8 +157,31 @@ with tabs[1]:
             color = '#ffcccc' if val == "CHƯA NỔ" else '#ccffcc'
             return f'background-color: {color}'
 
-        if not df_res.empty:
-            st.dataframe(df_res.style.applymap(color_status, subset=['Trạng thái']), use_container_width=True)
+if not df_res.empty:
+            # 1. Cấu hình độ rộng cột
+            # "small" là kích thước bé nhất Streamlit hỗ trợ
+            col_config = {
+                "Ngày": st.column_config.TextColumn("Ngày", width="medium"),
+                "KQ Nguồn": st.column_config.TextColumn("KQ", width="small"), 
+                "Dàn": st.column_config.TextColumn("Dàn Nuôi", width="large"),
+                "Trạng thái": st.column_config.TextColumn("Trạng thái", width="small"),
+            }
+            
+            # Tự động cấu hình cho tất cả cột K (K1 -> K21) thành "small"
+            # Và đổi tên hiển thị chỉ còn số (ví dụ "K1" -> "1") cho gọn
+            for k_col in [c for c in df_res.columns if c.startswith("K")]:
+                col_config[k_col] = st.column_config.TextColumn(
+                    k_col.replace("K", ""), # Đổi tên hiển thị: K1 -> 1
+                    width="small"
+                )
+
+            # 2. Hiển thị bảng
+            st.dataframe(
+                df_res.style.applymap(color_status, subset=['Trạng thái']),
+                column_config=col_config,
+                use_container_width=True,
+                hide_index=True
+            )
         
         # --- PHẦN CẢNH BÁO VÀ TÍNH MỨC SỐ ---
         if missed_patterns:
@@ -321,3 +344,4 @@ with tabs[4]:
         else:
 
             st.warning("Không tìm thấy trong phạm vi dữ liệu.")
+

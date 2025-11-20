@@ -100,4 +100,49 @@ def lay_nhi_hop(bet_digits, digits_2_dong):
     for a, b in combinations(unique_digits, 2):
         if a in bet_digits or b in bet_digits:
             nh += [a + b, b + a]
+
     return sorted(set(nh))
+    # --- BỔ SUNG LOGIC.PY ---
+
+def doc_so_chu(so):
+    """Chuyển số thành chữ (VD: 85 -> tám năm)"""
+    so = str(so)
+    map_chu = {
+        "0": "không", "1": "một", "2": "hai", "3": "ba", "4": "bốn",
+        "5": "năm", "6": "sáu", "7": "bảy", "8": "tám", "9": "chín"
+    }
+    return " ".join([map_chu.get(c, c) for c in so])
+
+# Các hàm lấy dàn số đầy đủ để hiển thị
+def get_bo_dan(bo_val):
+    return ", ".join(BO_DICT.get(bo_val, []))
+
+def get_kep_dan(kep_val):
+    return ", ".join(KEP_DICT.get(kep_val, []))
+
+def get_zodiac_dan(z_val):
+    return ", ".join(ZODIAC_DICT.get(z_val, []))
+
+def get_tong_dan(tong_val):
+    tong_val = int(tong_val)
+    res = [f"{i:02d}" for i in range(100) if (int(f"{i:02d}"[0]) + int(f"{i:02d}"[1])) % 10 == tong_val]
+    return ", ".join(res)
+
+def get_hieu_dan(hieu_val):
+    try:
+        h = int(hieu_val)
+        # Map ngược lại từ hàm hieu
+        hieu_map = {
+            0:  ["00","11","22","33","44","55","66","77","88","99"],
+            1:  ["09","10","21","32","43","54","65","76","87","98"],
+            2:  ["08","19","20","31","42","53","64","75","86","97"],
+            3:  ["07","18","29","30","41","52","63","74","85","96"],
+            4:  ["06","17","28","39","40","51","62","73","84","95"],
+            5:  ["05","16","27","38","49","50","61","72","83","94"],
+            6:  ["04","15","26","37","48","59","60","71","82","93"],
+            7:  ["03","14","25","36","47","58","69","70","81","92"],
+            8:  ["02","13","24","35","46","57","68","79","80","91"],
+            9:  ["01","12","23","34","45","56","67","78","89","90"]
+        }
+        return ", ".join(hieu_map.get(h, []))
+    except: return ""

@@ -280,8 +280,7 @@ with tabs[2]:
     # --- 2. XỬ LÝ DỮ LIỆU ---
     # Lấy dữ liệu tham chiếu (GĐB 2 số cuối) để check kết quả
     gdb_tails = [x['number'][-2:] for x in full_xsmb]
-    dates = [x['date'] for x in dt_show]
-
+    
     # Hàm tạo dataframe chi tiết (Bên trái)
     def create_detail_df(source_name, b_types):
         if source_name == "GĐB": src_data = xsmb_show
@@ -295,7 +294,6 @@ with tabs[2]:
             
             # 1. Tách số (A B C D E)
             nums = list(curr['number'])
-            # Nếu ít hơn 5 số thì bù trống, nếu nhiều hơn thì lấy 5 số cuối
             if len(nums) < 5: nums = ['']*(5-len(nums)) + nums
             else: nums = nums[-5:]
             
@@ -309,7 +307,6 @@ with tabs[2]:
             nhihop = []
             final_dan = []
             
-            # Logic tạo dàn (chỉ tạo nếu có bệt)
             if found:
                 dancham = logic.lay_dan_cham(list(found))
                 t1 = gdb_tails[i] if i < len(gdb_tails) else ""
@@ -317,14 +314,13 @@ with tabs[2]:
                 nhihop = logic.lay_nhi_hop(list(found), list(t1)+list(t2))
                 final_dan = sorted(set(dancham + nhihop))
 
-            # 4. Check kết quả (F1 -> F10) tương tự ảnh
+            # 4. Check kết quả (F1 -> F15)
             check_cols = {}
             has_win_row = False
             
-            # Check 15 ngày sau (F1...F15)
             for k in range(1, 16):
                 chk_idx = i - k
-                val_chk = "0" # Mặc định là 0 (trượt)
+                val_chk = "0" # Mặc định trượt
                 
                 if chk_idx >= 0:
                     res = gdb_tails[chk_idx]
@@ -341,10 +337,10 @@ with tabs[2]:
                 "date": shorten_date(curr['date']),
                 "A": nums[0], "B": nums[1], "C": nums[2], "D": nums[3], "E": nums[4],
                 "N1": curr['number'][-2:], # 2 số cuối
-                "Chạm": "".join(sorted(found)), # Hiển thị bệt gọn
+                "Chạm": "".join(sorted(found)),
                 "Bet": ",".join(sorted(found)),
                 "Dàn": " ".join(final_dan) if final_dan else "",
-                "WIN": has_win_row # Cờ để tô màu
+                "WIN": has_win_row # Cờ tô màu
             }
             row_item.update(check_cols)
             rows.append(row_item)
@@ -353,49 +349,35 @@ with tabs[2]:
 
     # Hàm tạo dataframe tổng hợp (Bên phải)
     def create_summary_df(b_types):
-        # Gom dữ liệu 3 nguồn
         srcs = [("ĐB", xsmb_show), ("G1", g1_show), ("TT", tt_show)]
-        
         summary_rows = []
-        # Duyệt qua các ngày (dùng độ dài của xsmb làm chuẩn)
         for i in range(len(xsmb_show)-1):
             row_item = {"date": shorten_date(xsmb_show[i]['date'])}
-            
-            # Với mỗi nguồn, tìm số bệt
             for name, data in srcs:
                 curr = data[i]
                 nxt = data[i+1]
-                
-                # Tìm riêng từng loại để tách cột (Phải/Thẳng/Trái) nếu muốn
-                # Nhưng trong ảnh là gộp chung vào cột nguồn
-                # Ở đây ta gộp chung các loại bệt đã chọn vào 1 cột cho mỗi nguồn
                 found = set()
                 for t in b_types:
                     found.update(logic.tim_chu_so_bet(list(curr['number']), list(nxt['number']), t))
-                
                 row_item[name] = ",".join(sorted(found))
-            
             summary_rows.append(row_item)
         return pd.DataFrame(summary_rows)
 
-    # --- 3. HIỂN THỊ GIAO DIỆN CHIA ĐÔI ---
-    
-    # Tạo 2 cột: Trái (Rộng - Chi tiết) - Phải (Hẹp - Tổng hợp)
-    # Tỉ lệ 2:1 hoặc 3:1 tùy màn hình
+    # --- 3. HIỂN THỊ GIAO DIỆN ---
     col_left, col_right = st.columns([65, 35]) 
 
-    # === CỘT TRÁI: CHI TIẾT & CHECK ===
+    # === CỘT TRÁI ===
     with col_left:
         st.caption(f"📋 Chi tiết & Soi KQ nuôi ({target_src})")
         df_detail = create_detail_df(target_src, bet_types)
         
         if not df_detail.empty:
-            # Tô màu dòng trúng (text đỏ) giống ảnh
+            # Tô màu dòng trúng
             def highlight_win_rows(row):
                 color = 'color: red; font-weight: bold;' if row['WIN'] else ''
                 return [color] * len(row)
 
-            # Cấu hình cột siêu nhỏ để giống excel
+            # Cấu hình cột
             cfg_left = {
                 "date": st.column_config.TextColumn("Ngày", width="small"),
                 "A": st.column_config.TextColumn("A", width="small"),
@@ -407,14 +389,12 @@ with tabs[2]:
                 "Chạm": st.column_config.TextColumn("Chạm", width="small"),
                 "Bet": st.column_config.TextColumn("Bet", width="small"),
                 "Dàn": st.column_config.TextColumn("Dàn Nuôi", width="large"),
-                "WIN": st.column_config.Column("W", hidden=True), # Ẩn cột cờ
+                # SỬA LỖI Ở ĐÂY: Dùng TextColumn thay vì Column
+                "WIN": st.column_config.TextColumn("W", hidden=True), 
             }
-            # Cấu hình F1-F15 nhỏ xíu
             for k in range(1, 16):
                 cfg_left[f"F{k}"] = st.column_config.TextColumn(f"{k}", width="small")
 
-            # Hiển thị bảng trái
-            # Ẩn bớt cột nếu cần, ở đây hiển thị full như ảnh
             st.dataframe(
                 df_detail.style.apply(highlight_win_rows, axis=1),
                 column_config=cfg_left,
@@ -423,20 +403,18 @@ with tabs[2]:
                 height=600
             )
 
-    # === CỘT PHẢI: TỔNG HỢP 3 ĐÀI ===
+    # === CỘT PHẢI ===
     with col_right:
-        st.caption("📑 Tổng hợp Chữ Số Bệt (3 Đài)")
+        st.caption("📑 Tổng hợp (3 Đài)")
         df_summary = create_summary_df(bet_types)
         
         if not df_summary.empty:
-            # Style bảng tổng hợp
             cfg_right = {
                 "date": st.column_config.TextColumn("Ngày", width="small"),
                 "ĐB": st.column_config.TextColumn("ĐB", width="small"),
                 "G1": st.column_config.TextColumn("G1", width="small"),
                 "TT": st.column_config.TextColumn("TT", width="small"),
             }
-            
             st.dataframe(
                 df_summary,
                 column_config=cfg_right,
@@ -585,5 +563,6 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
         else:
             st.warning("Không tìm thấy.")
+
 
 

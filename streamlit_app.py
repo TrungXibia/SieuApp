@@ -3,45 +3,34 @@ import pandas as pd
 import logic
 import data_fetcher
 
-# --- CẤU HÌNH GIAO DIỆN ---
+# --- CẤU HÌNH GIAO DIỆN CHUẨN ---
 st.set_page_config(
-    page_title="SIÊU GÀ MOBILE",
+    page_title="SIÊU GÀ APP",
     page_icon="🐔",
     layout="wide",
-    initial_sidebar_state="collapsed" # Tự động thu gọn menu trên mobile
+    initial_sidebar_state="expanded"
 )
 
-# --- CSS TÙY CHỈNH CHO MOBILE ---
-# Ép padding của bảng nhỏ lại tối đa để vừa màn hình điện thoại
+# --- CSS NHẸ NHÀNG (CHỈ TỐI ƯU TAB) ---
 st.markdown("""
 <style>
     .stTabs [data-baseweb="tab-list"] { gap: 2px; }
-    .stTabs [data-baseweb="tab"] { height: 40px; padding: 5px 10px; font-size: 14px; }
-    /* Thu nhỏ padding của ô trong bảng */
-    div[data-testid="stDataFrame"] div[class^="stDataFrame"] td {
-        padding: 2px 5px !important; 
-        font-size: 13px;
-    }
-    div[data-testid="stDataFrame"] div[class^="stDataFrame"] th {
-        padding: 2px 5px !important;
-        font-size: 13px;
-    }
+    .stTabs [data-baseweb="tab"] { height: 50px; white-space: pre-wrap; background-color: #f0f2f6; border-radius: 4px 4px 0 0; gap: 1px; padding-top: 10px; padding-bottom: 10px; }
+    .stTabs [aria-selected="true"] { background-color: #ffffff; border-top: 2px solid #ff4b4b; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- HÀM TIỆN ÍCH: RÚT GỌN NGÀY ---
+# --- HÀM RÚT GỌN NGÀY (GIỮ NGUYÊN VÌ RẤT HỮU ÍCH) ---
 def shorten_date(date_str):
-    """Chuyển 'Thứ Tư ngày 19-11-2025' thành '19/11'"""
     try:
-        # Lấy phần ngày tháng năm (ví dụ: 19-11-2025)
         parts = date_str.split(" ")
-        raw_date = parts[-1] # Lấy phần tử cuối
-        day_mon = raw_date[:5] # Lấy 5 ký tự đầu: 19-11
+        raw_date = parts[-1] 
+        day_mon = raw_date[:5] 
         return day_mon
     except:
         return date_str
 
-# --- 1. QUẢN LÝ DỮ LIỆU (CACHE) ---
+# --- QUẢN LÝ DỮ LIỆU ---
 @st.cache_data(ttl=3600)
 def load_all_data(num_days):
     dt = data_fetcher.fetch_dien_toan(num_days)
@@ -50,30 +39,31 @@ def load_all_data(num_days):
     g1 = data_fetcher.fetch_giai_nhat(num_days, dt)
     return dt, tt, xsmb, g1
 
-# --- 2. SIDEBAR ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("🐔 SIÊU GÀ TOOL")
     days_fetch = st.number_input("Tải dữ liệu (ngày)", 50, 365, 100, step=50)
-    days_show = st.slider("Hiển thị (ngày)", 5, 50, 20) # Mặc định ít ngày hơn cho mobile
-    if st.button("🔄 Cập nhật"):
+    days_show = st.slider("Hiển thị (ngày)", 10, 100, 30)
+    if st.button("🔄 Cập nhật dữ liệu"):
         st.cache_data.clear()
         st.rerun()
+    st.caption("Bản ổn định v2.0")
 
 # --- LOAD DATA ---
 try:
-    with st.spinner("Đang tải..."):
+    with st.spinner("Đang tải dữ liệu..."):
         full_dt, full_tt, full_xsmb, full_g1 = load_all_data(days_fetch)
 except Exception as e:
-    st.error(f"Lỗi: {e}")
+    st.error(f"Lỗi kết nối: {e}")
     st.stop()
 
-# Cắt và RÚT GỌN NGÀY ngay từ đầu
+# Cắt dữ liệu
 dt_show = full_dt[:days_show]
 tt_show = full_tt[:days_show]
 xsmb_show = full_xsmb[:days_show]
 g1_show = full_g1[:days_show]
 
-# Hàm xử lý display data chung
+# Hàm chuẩn bị dữ liệu hiển thị (Rút gọn ngày)
 def prepare_display_data(data):
     new_data = []
     for item in data:
@@ -87,56 +77,51 @@ tt_disp = prepare_display_data(tt_show)
 xsmb_disp = prepare_display_data(xsmb_show)
 g1_disp = prepare_display_data(g1_show)
 
-# --- 3. MAIN TABS ---
-# Đặt tên Tab ngắn gọn cho mobile
-tabs = st.tabs(["KQ", "Nuôi", "Bệt", "Last2", "Dò"])
+# --- MAIN TABS ---
+tabs = st.tabs(["📊 Kết Quả", "🎯 Dàn Nuôi", "🎲 Bệt (Bet)", "📈 Thống Kê Last2", "🔍 Dò Cầu"])
 
 # === TAB 1: KẾT QUẢ ===
 with tabs[0]:
-    # Điện toán
-    st.caption("Điện Toán 123")
-    if dt_disp:
-        df_dt = pd.DataFrame(dt_disp)
-        df_dt['Số'] = df_dt['numbers'].apply(lambda x: "-".join(x))
-        # Cấu hình bảng gọn
-        st.dataframe(
-            df_dt[['date', 'Số']], 
-            hide_index=True, 
-            use_container_width=True,
-            column_config={
-                "date": st.column_config.TextColumn("Ngày", width="small"),
-                "Số": st.column_config.TextColumn("Kết Quả", width="medium")
-            }
-        )
-    
-    # Các đài khác gộp chung để đỡ scroll
-    st.caption("Thần Tài | GĐB | G1")
-    c1, c2, c3 = st.columns(3)
-    
+    c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**Thần Tài**")
-        if tt_disp: st.dataframe(pd.DataFrame(tt_disp), hide_index=True, use_container_width=True, column_config={"date":None, "number":"Số"})
+        st.subheader("Điện Toán 123")
+        if dt_disp:
+            df_dt = pd.DataFrame(dt_disp)
+            df_dt['Chuỗi số'] = df_dt['numbers'].apply(lambda x: " - ".join(x))
+            st.dataframe(
+                df_dt[['date', 'Chuỗi số']], 
+                hide_index=True, 
+                use_container_width=True,
+                column_config={"date": "Ngày", "Chuỗi số": "Kết Quả"}
+            )
     with c2:
-        st.markdown("**GĐB**")
-        if xsmb_disp: st.dataframe(pd.DataFrame(xsmb_disp), hide_index=True, use_container_width=True, column_config={"date":None, "number":"Số"})
+        st.subheader("Thần Tài")
+        if tt_disp:
+            st.dataframe(pd.DataFrame(tt_disp), hide_index=True, use_container_width=True, column_config={"date":"Ngày", "number":"Số"})
+    
+    st.divider()
+    c3, c4 = st.columns(2)
     with c3:
-        st.markdown("**Giải 1**")
-        if g1_disp: st.dataframe(pd.DataFrame(g1_disp), hide_index=True, use_container_width=True, column_config={"date":None, "number":"Số"})
+        st.subheader("XSMB (GĐB)")
+        if xsmb_disp:
+            st.dataframe(pd.DataFrame(xsmb_disp), hide_index=True, use_container_width=True, column_config={"date":"Ngày", "number":"Số"})
+    with c4:
+        st.subheader("Giải Nhất (G1)")
+        if g1_disp:
+            st.dataframe(pd.DataFrame(g1_disp), hide_index=True, use_container_width=True, column_config={"date":"Ngày", "number":"Số"})
 
-# === TAB 2: DÀN NUÔI (QUAN TRỌNG NHẤT) ===
+# === TAB 2: DÀN NUÔI (ĐÃ SỬA LẠI HIỂN THỊ CHUẨN) ===
 with tabs[1]:
-    st.caption("Phân Tích Dàn Nuôi")
-    
-    # Gom controls cho gọn
-    c_src, c_type, c_dup = st.columns([1,1,1])
-    source_comp = c_src.radio("So:", ["GĐB", "G1"], horizontal=True, label_visibility="collapsed")
-    res_type = c_type.selectbox("Nguồn:", ["Thần tài", "Điện toán"], label_visibility="collapsed")
-    include_dup = c_dup.checkbox("Kép", value=True)
-    
-    cham_filter = st.selectbox("Lọc chạm:", [""] + [str(i) for i in range(10)])
+    st.header("Phân Tích Dàn Nuôi")
+    col_ctrl1, col_ctrl2 = st.columns(2)
+    with col_ctrl1:
+        source_comp = st.radio("So sánh với:", ["GĐB", "G1"], horizontal=True)
+        res_type = st.selectbox("Nguồn tạo dàn:", ["Thần tài", "Điện toán"])
+    with col_ctrl2:
+        cham_filter = st.selectbox("Lọc chạm (Optional):", [""] + [str(i) for i in range(10)])
+        include_dup = st.checkbox("Bao gồm số trùng (Kép)", value=True)
 
-    if st.button("🚀 Chạy"):
-        # Chọn nguồn dữ liệu (lấy từ bản gốc chưa rút gọn ngày để tính toán chính xác nếu cần)
+    if st.button("🚀 Phân Tích Ngay"):
         source_list = [x["number"] for x in tt_show] if res_type == "Thần tài" else ["".join(x["numbers"]) for x in dt_show]
         ref_data = full_xsmb if source_comp == "GĐB" else full_g1
         latest_ref_val = ref_data[0]["number"][-2:] if ref_data else ""
@@ -161,133 +146,175 @@ with tabs[1]:
             for k in range(1, check_range + 1):
                 check_idx = i - k
                 val_ref = ""
-                if check_idx >= 0: val_ref = ref_data[check_idx]["number"][-2:]
+                if check_idx >= 0:
+                    val_ref = ref_data[check_idx]["number"][-2:]
                 
                 status = val_ref if val_ref in combos else ""
                 k_cols[f"K{k}"] = status
                 if status: hits += 1
             
-            # Dùng ngày đã rút gọn để hiển thị
-            date_short = shorten_date(dt_show[i]['date'])
-            
+            # Dùng ngày rút gọn
             row = {
-                "Ngày": date_short,
-                "KQ": val,
+                "Ngày": shorten_date(dt_show[i]['date']),
+                "KQ Nguồn": val,
                 "Dàn": " ".join(sorted(combos)),
-                "TT": "NO" if hits > 0 else "MISS" # Viết tắt cho gọn cột
+                "Trạng thái": "Đã Nổ" if hits > 0 else "CHƯA NỔ"
             }
             row.update(k_cols)
             results.append(row)
             
             if hits == 0 and i <= 30: 
                 missed_str = " ".join(sorted(combos))
-                missed_patterns.append(f"{date_short} ({val}): {missed_str}")
+                missed_patterns.append(f"📅 {shorten_date(dt_show[i]['date'])} (KQ: {val}): {missed_str}")
                 raw_missed_data.append(missed_str)
 
         df_res = pd.DataFrame(results)
         
         def color_status(val):
-            return f'background-color: {"#ffcccc" if val == "MISS" else "#ccffcc"}'
+            return f'background-color: {"#ffcccc" if val == "CHƯA NỔ" else "#ccffcc"}'
 
         if not df_res.empty:
-            # CẤU HÌNH CỘT SIÊU GỌN CHO MOBILE
+            # Cấu hình cột chuẩn, không ép CSS
             col_config = {
                 "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-                "KQ": st.column_config.TextColumn("KQ", width="small"), 
-                "Dàn": st.column_config.TextColumn("Dàn", width="medium"),
-                "TT": st.column_config.TextColumn("TT", width="small"),
+                "KQ Nguồn": st.column_config.TextColumn("KQ", width="small"), 
+                "Dàn": st.column_config.TextColumn("Dàn Nuôi", width="medium"),
+                "Trạng thái": st.column_config.TextColumn("Trạng thái", width="small"),
             }
             
-            # Cấu hình cột K: Đổi tên "K1" -> "1", ép width="small"
-            k_cols_list = [c for c in df_res.columns if c.startswith("K")]
-            for k_col in k_cols_list:
+            # Cấu hình cột K
+            for k_col in [c for c in df_res.columns if c.startswith("K")]:
                 col_config[k_col] = st.column_config.TextColumn(
                     k_col.replace("K", ""), 
-                    width="small" # Ép nhỏ nhất có thể
+                    width="small"
                 )
 
             st.dataframe(
-                df_res.style.applymap(color_status, subset=['TT']),
+                df_res.style.applymap(color_status, subset=['Trạng thái']),
                 column_config=col_config,
-                use_container_width=False, # Tắt giãn dòng để cột co lại
-                hide_index=True,
-                height=600
+                use_container_width=True, # Để True cho bảng tràn màn hình đẹp
+                hide_index=True
             )
         
         if missed_patterns:
-            st.error(f"Dàn MISS (30 ngày):")
-            # Tính mức số
-            if raw_missed_data:
-                from collections import Counter
-                all_nums = " ".join(raw_missed_data).split()
-                counts = Counter(all_nums)
-                levels = {}
-                for num, freq in counts.items(): levels.setdefault(freq, []).append(num)
-                
-                for lvl in sorted(levels.keys(), reverse=True):
-                    nums = sorted(levels[lvl])
-                    disp = [f"**{n}**" if n==latest_ref_val else n for n in nums]
-                    st.markdown(f"**Mức {lvl}:** {', '.join(disp)}")
+            st.divider()
+            c_warn, c_stat = st.columns([1, 1])
+            with c_warn:
+                st.warning("⚠️ CẢNH BÁO: Các dàn chưa nổ (30 ngày gần nhất)")
+                st.text_area("Chi tiết:", "\n".join(missed_patterns), height=300)
+            
+            with c_stat:
+                st.info("📊 THỐNG KÊ MỨC SỐ")
+                if raw_missed_data:
+                    from collections import Counter
+                    all_nums = " ".join(raw_missed_data).split()
+                    counts = Counter(all_nums)
+                    levels = {}
+                    for num, freq in counts.items(): levels.setdefault(freq, []).append(num)
+                    
+                    for lvl in sorted(levels.keys(), reverse=True):
+                        nums = sorted(levels[lvl])
+                        disp = []
+                        for n in nums:
+                            if n == latest_ref_val:
+                                disp.append(f"<span style='color:red; font-weight:bold; border:1px solid red; padding:2px'>{n}</span>")
+                            else:
+                                disp.append(n)
+                        st.markdown(f"**Mức {lvl}** ({len(nums)} số): {', '.join(disp)}", unsafe_allow_html=True)
+                    st.caption(f"*Số đỏ là trùng với KQ mới nhất ({latest_ref_val})*")
 
 # === TAB 3: BỆT ===
 with tabs[2]:
-    st.caption("Thống Kê Bệt")
-    b_src = st.selectbox("Nguồn:", ["GĐB", "G1", "Thần Tài"], label_visibility="collapsed")
-    b_types = st.multiselect("Kiểu:", ["Bệt Phải", "Thẳng", "Bệt trái"], default=["Bệt Phải"])
+    st.header("Thống Kê Bệt")
+    bet_src_name = st.selectbox("Nguồn Bệt:", ["GĐB", "G1", "Thần Tài"])
+    bet_opts = st.multiselect("Kiểu Bệt:", ["Bệt Phải", "Thẳng", "Bệt trái"], default=["Bệt Phải", "Thẳng", "Bệt trái"])
     
-    if b_src == "GĐB": s_dat = xsmb_show
-    elif b_src == "G1": s_dat = g1_show
-    else: s_dat = tt_show
+    if bet_src_name == "GĐB": src_dat = xsmb_show
+    elif bet_src_name == "G1": src_dat = g1_show
+    else: src_dat = tt_show
     
     gdb_tails = [x['number'][-2:] for x in full_xsmb]
     
-    b_rows = []
-    for i in range(len(s_dat)-1):
-        curr, nxt = s_dat[i], s_dat[i+1]
-        found = set()
-        for t in b_types:
-            found.update(logic.tim_chu_so_bet(list(curr['number']), list(nxt['number']), t))
+    bet_rows = []
+    for i in range(len(src_dat)):
+        curr_item = src_dat[i]
+        next_item = src_dat[i+1] if i+1 < len(src_dat) else None
+        if not next_item: continue
         
-        if found:
-            dancham = logic.lay_dan_cham(list(found))
-            t1, t2 = gdb_tails[i], gdb_tails[i+1]
-            nhihop = logic.lay_nhi_hop(list(found), list(t1)+list(t2))
-            final = sorted(set(dancham + nhihop))
-            res_mai = gdb_tails[i-1] if i-1 >= 0 else "?"
-            
-            b_rows.append({
-                "Ngày": shorten_date(curr['date']),
-                "Bệt": ",".join(sorted(found)),
-                "Mai": f"{res_mai} ({'OK' if res_mai in final else '-'})"
-            })
-            
-    st.dataframe(pd.DataFrame(b_rows), hide_index=True, use_container_width=True)
+        d1 = list(curr_item['number'])
+        d2 = list(next_item['number'])
+        found_bet = set()
+        for opt in bet_opts: found_bet.update(logic.tim_chu_so_bet(d1, d2, opt))
+        
+        if not found_bet: continue
+        
+        dancham = logic.lay_dan_cham(list(found_bet))
+        t1 = gdb_tails[i] if i < len(gdb_tails) else ""
+        t2 = gdb_tails[i+1] if i+1 < len(gdb_tails) else ""
+        nhihop = logic.lay_nhi_hop(list(found_bet), list(t1)+list(t2))
+        final_dan = sorted(set(dancham + nhihop))
+        res_mai = gdb_tails[i-1] if i-1 >= 0 else "?"
+        is_win = "WIN" if res_mai in final_dan else "-"
+        
+        bet_rows.append({
+            "Ngày": shorten_date(curr_item['date']),
+            "Nguồn": curr_item['number'],
+            "Bệt": ",".join(sorted(found_bet)),
+            "Dàn Nuôi": " ".join(final_dan),
+            "KQ Mai": f"{res_mai} ({is_win})"
+        })
+    st.dataframe(pd.DataFrame(bet_rows), use_container_width=True, hide_index=True)
 
-# === TAB 4: LAST2 ===
+# === TAB 4: LAST 2 ===
 with tabs[3]:
-    st.caption("Thống Kê 2 Số")
-    l2_src = st.radio("Nguồn:", ["GĐB", "G1"], horizontal=True)
+    st.header("Thống Kê 2 Số Cuối")
+    l2_src = st.radio("Nguồn:", ["GĐB", "G1"], horizontal=True, key="l2")
     dat_l2 = full_xsmb if l2_src == "GĐB" else full_g1
     
-    l2_rows = []
+    rows_l2 = []
     for x in dat_l2[:days_show]:
         n = x['number'][-2:]
-        l2_rows.append({
+        rows_l2.append({
             "Ngày": shorten_date(x['date']),
             "Số": n,
             "Bộ": logic.bo(n),
-            "T": (int(n[0])+int(n[1]))%10,
+            "Tổng": (int(n[0])+int(n[1]))%10,
+            "Kép": logic.kep(n)
         })
-    st.dataframe(pd.DataFrame(l2_rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(rows_l2), use_container_width=True, hide_index=True)
+    
+    st.subheader("Top Bộ Số Lâu Chưa Ra")
+    all_tails = [x['number'][-2:] for x in dat_l2]
+    
+    def analyze_gan(extractor):
+        last_seen = {}
+        for idx, val in enumerate(all_tails):
+            k = extractor(val)
+            if k not in last_seen: last_seen[k] = idx
+        res = [{"Giá trị": k, "Số ngày chưa ra": v} for k,v in last_seen.items()]
+        return pd.DataFrame(res).sort_values("Số ngày chưa ra", ascending=False).head(10)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write("🔴 **Bộ Gan**")
+        st.dataframe(analyze_gan(logic.bo), hide_index=True, use_container_width=True)
+    with c2:
+        st.write("🔵 **Tổng Gan**")
+        st.dataframe(analyze_gan(lambda x: str((int(x[0])+int(x[1]))%10)), hide_index=True, use_container_width=True)
 
 # === TAB 5: DÒ CẦU ===
 with tabs[4]:
-    tgt = st.text_input("Tìm số (VD: 68):", max_chars=2)
-    if tgt and len(tgt)==2:
-        f = []
+    st.header("Công Cụ Dò Cầu")
+    target = st.text_input("Nhập cặp số muốn tìm (VD: 68):", max_chars=2)
+    if target and len(target) == 2:
+        found = []
         for x in full_xsmb[:days_fetch]:
-            if tgt in x['number']: f.append({"Ngày": shorten_date(x['date']), "Nguồn": "GĐB", "Số": x['number']})
+            if target in x['number']: found.append({"Ngày": shorten_date(x['date']), "Nguồn": "GĐB", "Số": x['number']})
         for x in full_g1[:days_fetch]:
-            if tgt in x['number']: f.append({"Ngày": shorten_date(x['date']), "Nguồn": "G1", "Số": x['number']})
-        if f: st.dataframe(pd.DataFrame(f), hide_index=True, use_container_width=True)
-        else: st.caption("Không thấy")
+            if target in x['number']: found.append({"Ngày": shorten_date(x['date']), "Nguồn": "G1", "Số": x['number']})
+        
+        if found:
+            st.success(f"Tìm thấy {len(found)} lần xuất hiện.")
+            st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
+        else:
+            st.warning("Không tìm thấy.")

@@ -398,7 +398,7 @@ with tabs[4]:
             st.warning("Không tìm thấy.")
 
 # ------------------------------------------------------------------------------
-# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - SỬA LỖI & NÂNG CẤP
+# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - PHIÊN BẢN SỬA LỖI MATPLOTLIB
 # ------------------------------------------------------------------------------
 with tabs[5]:
     st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
@@ -407,7 +407,7 @@ with tabs[5]:
         st.warning("Cần ít nhất 7 ngày dữ liệu để tính tần suất.")
     else:
         # ==========================================================================
-        # PHẦN 1: TẦN SUẤT CHỮ SỐ 0-9 (GIỮ NGUYÊN)
+        # PHẦN 1: TẦN SUẤT CHỮ SỐ 0-9
         # ==========================================================================
         st.markdown("##### 1. Tần suất chữ số 0-9")
         freq_rows_digits = []
@@ -417,6 +417,7 @@ with tabs[5]:
             date_str = shorten_date(current_day['date'])
             kq_str = "".join(current_day['numbers'])
             
+            # Lấy cửa sổ 7 ngày
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
             
@@ -428,7 +429,6 @@ with tabs[5]:
             
             row = {"Ngày": date_str, "KQ": kq_str}
             
-            # TOP 3
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             top_3 = sorted_freqs[:3]
             disp_grps = []
@@ -474,12 +474,17 @@ with tabs[5]:
                 except: styles.append("")
             return styles
 
-        st.dataframe(df_digits.style.apply(highlight_cols, axis=1), column_config=col_cfg_digits, hide_index=True, use_container_width=False)
+        st.dataframe(
+            df_digits.style.apply(highlight_cols, axis=1), 
+            column_config=col_cfg_digits, 
+            hide_index=True, 
+            use_container_width=False
+        )
 
         st.divider()
 
         # ==========================================================================
-        # PHẦN 2: TẦN SUẤT CẶP SỐ 00-99 (THAY THẾ HOÀN TOÀN HEATMAP CŨ)
+        # PHẦN 2: TẦN SUẤT CẶP SỐ 00-99 (ĐÃ LOẠI BỎ HEATMAP GÂY LỖI)
         # ==========================================================================
         st.markdown("##### 2. Tần suất cặp số 00-99")
         
@@ -493,13 +498,12 @@ with tabs[5]:
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
             
-            # --- ĐẾM 00-99 ---
+            # Đếm 00-99
             counts_map = {}
             for num in range(100):
-                pair = f"{num:02d}" # Tạo chuỗi 00, 01... 99
+                pair = f"{num:02d}"
                 counts_map[pair] = merged_str.count(pair)
             
-            # Gom nhóm tần suất
             freq_groups = {}
             max_freq = 0
             for pair, count in counts_map.items():
@@ -513,56 +517,11 @@ with tabs[5]:
             top_3 = sorted_freqs[:3]
             disp_grps = []
             for f in top_3:
-                # Với cặp số, dùng dấu phẩy ngăn cách: 00,01
                 disp_grps.append(",".join(sorted(freq_groups[f])))
             
-            # Ngăn cách các mức bằng dấu | cho dễ nhìn
             row["TOP 3"] = " | ".join(disp_grps)
             
-            # Điền cột
-            limit_col = max(10, max_freq + 1) # Hiển thị ít nhất đến cột 9
-            for f in range(limit_col): 
-                pairs = freq_groups.get(f, [])
-                row[str(f)] = " ".join(sorted(pairs)) # Trong ô dùng dấu cách
-            
-            freq_rows_pairs.append(row)
+            # Giới hạn cột hiển thị (thường cặp số chỉ ra max 5-6 lần là nhiều)
+            limit_col = max(8, max_freq + 1) 
+            for f
 
-        df_pairs = pd.DataFrame(freq_rows_pairs)
-        
-        # Sắp xếp cột
-        cols_p = ["Ngày", "KQ"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 3"]
-        df_pairs = df_pairs[cols_p]
-
-        # Style
-        col_cfg_pairs = {
-            "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-            "KQ": st.column_config.TextColumn("Kết Quả", width="medium"),
-            "TOP 3": st.column_config.TextColumn("TOP 3 (Cao nhất)", width="large"),
-        }
-        for f in range(limit_col):
-            if str(f) in df_pairs.columns:
-                col_cfg_pairs[str(f)] = st.column_config.TextColumn(str(f), width="small")
-
-        # Hàm tô màu riêng cho 00-99 (Ngưỡng thấp hơn vì cặp số ít về hơn)
-        def highlight_cols_pairs(row):
-            styles = []
-            for col in row.index:
-                val = row[col]
-                if col == "TOP 3":
-                    styles.append('background-color: #e6f7ff; color: #0050b3; font-weight: bold; border-left: 2px solid #ccc;')
-                    continue
-                if col in ["Ngày", "KQ"]:
-                    styles.append("")
-                    continue
-                try:
-                    freq = int(col)
-                    if not val: styles.append("")
-                    elif freq == 0: styles.append('color: gray; font-style: italic;')
-                    # Cặp số: >= 4 lần là rất nhiều (Đỏ)
-                    elif freq >= 4: styles.append('color: #ff0000; font-weight: bold; background-color: #ffe6e6')
-                    elif freq >= 2: styles.append('color: #cc0000; font-weight: bold;')
-                    else: styles.append('color: black;')
-                except: styles.append("")
-            return styles
-
-        st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=False)

@@ -362,4 +362,85 @@ with tabs[2]:
             )
 
     with col_right:
-        st.ca
+        st.caption("📑 Tổng hợp (3 Đài)")
+        df_summ = create_summary_df(bet_types)
+        if not df_summ.empty:
+            cfg_right = {
+                "date": st.column_config.TextColumn("Ngày", width="small"),
+                "ĐB": st.column_config.TextColumn("ĐB", width="small"),
+                "G1": st.column_config.TextColumn("G1", width="small"),
+                "TT": st.column_config.TextColumn("TT", width="small"),
+            }
+            st.dataframe(df_summ, column_config=cfg_right, hide_index=True, use_container_width=True, height=600)
+
+# ------------------------------------------------------------------------------
+# TAB 4: THỐNG KÊ & COPY
+# ------------------------------------------------------------------------------
+with tabs[3]:
+    st.caption("Thống Kê Top Lâu Ra & Tạo Mẫu Copy")
+    l2_src = st.radio("Nguồn:", ["GĐB", "G1"], horizontal=True, key="l2_src_radio")
+    dat_l2 = full_xsmb if l2_src == "GĐB" else full_g1
+    all_tails = [x['number'][-2:] for x in dat_l2]
+
+    def find_top_gan(data_list, extract_func, label, get_dan_func):
+        last_seen = {}
+        for idx, val in enumerate(data_list):
+            k = extract_func(val)
+            if k not in last_seen: last_seen[k] = idx
+        if not last_seen: return None
+        top_val = max(last_seen, key=last_seen.get)
+        return {
+            "Loại": label, "Giá trị": top_val, "Số ngày": last_seen[top_val],
+            "Chữ": logic.doc_so_chu(last_seen[top_val]), "Dàn": get_dan_func(top_val)
+        }
+
+    stats = []
+    stats.append(find_top_gan(all_tails, logic.bo, "Bộ", logic.get_bo_dan))
+    stats.append(find_top_gan(all_tails, logic.hieu, "Hiệu", logic.get_hieu_dan))
+    stats.append(find_top_gan(all_tails, logic.zodiac, "Con Giáp", logic.get_zodiac_dan))
+    stats.append(find_top_gan(all_tails, lambda x: str((int(x[0])+int(x[1]))%10), "Tổng", logic.get_tong_dan))
+    stats.append(find_top_gan(all_tails, logic.kep, "Kép", logic.get_kep_dan))
+
+    c_text, c_table = st.columns([1, 1])
+    with c_text:
+        st.info("📝 Mẫu văn bản")
+        txt_out = f"==== TOP GAN {l2_src} ({shorten_date(dt_show[0]['date'])}) ====\n\n"
+        for item in stats:
+            if item:
+                val_txt = logic.doc_so_chu(item['Giá trị']) if str(item['Giá trị']).isdigit() else str(item['Giá trị'])
+                txt_out += f"{item['Loại']}: {val_txt}\nDàn: {item['Dàn']}\nLâu ra: {item['Chữ']} ngày\n---\n"
+        txt_out += "#xoso #thongke\n⛔ Chỉ mang tính chất tham khảo!"
+        st.text_area("Nội dung:", txt_out, height=400)
+
+    with c_table:
+        st.success("🏆 Bảng Gan Tổng Hợp")
+        df_stats = pd.DataFrame([s for s in stats if s])
+        if not df_stats.empty:
+            st.dataframe(df_stats[["Loại", "Giá trị", "Số ngày", "Dàn"]], hide_index=True, use_container_width=True)
+            
+        st.markdown("#### ☠️ Top 10 Số Đề Gan")
+        last_seen_num = {}
+        for idx, val in enumerate(all_tails):
+            if val not in last_seen_num: last_seen_num[val] = idx
+        gan_nums = [{"Số": k, "Gan": v} for k,v in last_seen_num.items()]
+        df_gan_nums = pd.DataFrame(gan_nums).sort_values("Gan", ascending=False).head(10)
+        st.dataframe(df_gan_nums.T, use_container_width=True)
+
+# ------------------------------------------------------------------------------
+# TAB 5: DÒ CẦU
+# ------------------------------------------------------------------------------
+with tabs[4]:
+    st.caption("Công Cụ Dò Cầu")
+    target = st.text_input("Nhập cặp số (VD: 68):", max_chars=2)
+    if target and len(target) == 2:
+        found = []
+        for x in full_xsmb[:days_fetch]:
+            if target in x['number']: found.append({"Ngày": shorten_date(x['date']), "Nguồn": "GĐB", "Số": x['number']})
+        for x in full_g1[:days_fetch]:
+            if target in x['number']: found.append({"Ngày": shorten_date(x['date']), "Nguồn": "G1", "Số": x['number']})
+        
+        if found:
+            st.success(f"Tìm thấy {len(found)} lần.")
+            st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
+        else:
+            st.warning("Không tìm thấy.")

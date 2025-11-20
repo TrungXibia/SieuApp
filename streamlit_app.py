@@ -246,86 +246,204 @@ with tabs[1]:
                         st.markdown(f"**Mức {lvl}** ({len(nums)} số): {', '.join(disp)}", unsafe_allow_html=True)
                     st.caption(f"*Số đỏ: Trùng với KQ mới nhất ({latest_ref_val})*")
 
-# ==========================================
-# TAB 3: BỆT (KÈM CHECK 7 NGÀY)
-# ==========================================
+# === TAB 3: BỆT (GIAO DIỆN PC STYLE) ===
 with tabs[2]:
-    st.caption("Thống Kê Bệt & Kiểm Tra 7 Ngày")
-    
-    c_src, c_type = st.columns([1, 2])
-    with c_src:
-        b_src = st.selectbox("Nguồn:", ["GĐB", "G1", "Thần Tài"], label_visibility="collapsed")
-    with c_type:
-        b_types = st.multiselect("Kiểu:", ["Bệt Phải", "Thẳng", "Bệt trái"], default=["Bệt Phải", "Thẳng"])
-    
-    if b_src == "GĐB": s_dat = xsmb_show
-    elif b_src == "G1": s_dat = g1_show
-    else: s_dat = tt_show
-    
-    gdb_tails = [x['number'][-2:] for x in full_xsmb]
-    
-    bet_rows = []
-    for i in range(len(s_dat)-1):
-        curr, nxt = s_dat[i], s_dat[i+1]
-        found = set()
-        for t in b_types:
-            found.update(logic.tim_chu_so_bet(list(curr['number']), list(nxt['number']), t))
-        
-        if not found: continue
-        
-        dancham = logic.lay_dan_cham(list(found))
-        t1 = gdb_tails[i] if i < len(gdb_tails) else ""
-        t2 = gdb_tails[i+1] if i+1 < len(gdb_tails) else ""
-        nhihop = logic.lay_nhi_hop(list(found), list(t1)+list(t2))
-        final_dan = sorted(set(dancham + nhihop))
-        
-        row = {
-            "Ngày": shorten_date(curr['date']),
-            "Bệt": ",".join(sorted(found)),
-            "Dàn": " ".join(final_dan),
-        }
-        
-        # Check T1 -> T7
-        for k in range(1, 8):
-            check_idx = i - k
-            col_name = f"T{k}"
-            if check_idx >= 0:
-                res_val = gdb_tails[check_idx]
-                if res_val in final_dan:
-                    row[col_name] = res_val
-                else:
-                    row[col_name] = ""
-            else:
-                row[col_name] = "?"
-        
-        bet_rows.append(row)
+    # CSS riêng cho Tab này để giống phần mềm PC (font nhỏ, cột hẹp)
+    st.markdown("""
+    <style>
+        div[data-testid="stDataFrame"] td { font-size: 12px; padding: 2px !important; }
+        div[data-testid="stDataFrame"] th { font-size: 12px; padding: 2px !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # --- 1. KHUNG CẤU HÌNH TRÊN CÙNG ---
+    with st.container():
+        c_cfg1, c_cfg2 = st.columns([1, 3])
+        with c_cfg1:
+            # Chọn nguồn cho bảng chi tiết bên trái
+            target_src = st.selectbox("Nguồn phân tích (Bảng trái):", ["GĐB", "G1", "Thần Tài"], index=0)
+        with c_cfg2:
+            # Chọn kiểu bệt áp dụng chung
+            st.write("Kiểu bệt:")
+            c_b1, c_b2, c_b3 = st.columns(3)
+            use_phai = c_b1.checkbox("Bệt Phải (Cheo)", value=True)
+            use_thang = c_b2.checkbox("Thẳng", value=True)
+            use_trai = c_b3.checkbox("Bệt Trái", value=True)
             
-    if bet_rows:
-        df_bet = pd.DataFrame(bet_rows)
+            bet_types = []
+            if use_phai: bet_types.append("Bệt Phải")
+            if use_thang: bet_types.append("Thẳng")
+            if use_trai: bet_types.append("Bệt trái")
+
+    st.divider()
+
+    # --- 2. XỬ LÝ DỮ LIỆU ---
+    # Lấy dữ liệu tham chiếu (GĐB 2 số cuối) để check kết quả
+    gdb_tails = [x['number'][-2:] for x in full_xsmb]
+    dates = [x['date'] for x in dt_show]
+
+    # Hàm tạo dataframe chi tiết (Bên trái)
+    def create_detail_df(source_name, b_types):
+        if source_name == "GĐB": src_data = xsmb_show
+        elif source_name == "G1": src_data = g1_show
+        else: src_data = tt_show
         
-        def highlight_hits(val):
-            if val and val != "?" and val.isdigit():
-                return 'background-color: #ccffcc; color: black; font-weight: bold;'
-            elif val == "?":
-                return 'color: gray;'
-            return ''
+        rows = []
+        for i in range(len(src_data)-1):
+            curr = src_data[i]
+            nxt = src_data[i+1]
+            
+            # 1. Tách số (A B C D E)
+            nums = list(curr['number'])
+            # Nếu ít hơn 5 số thì bù trống, nếu nhiều hơn thì lấy 5 số cuối
+            if len(nums) < 5: nums = ['']*(5-len(nums)) + nums
+            else: nums = nums[-5:]
+            
+            # 2. Tìm Bệt
+            found = set()
+            for t in b_types:
+                found.update(logic.tim_chu_so_bet(list(curr['number']), list(nxt['number']), t))
+            
+            # 3. Tạo dàn
+            dancham = []
+            nhihop = []
+            final_dan = []
+            
+            # Logic tạo dàn (chỉ tạo nếu có bệt)
+            if found:
+                dancham = logic.lay_dan_cham(list(found))
+                t1 = gdb_tails[i] if i < len(gdb_tails) else ""
+                t2 = gdb_tails[i+1] if i+1 < len(gdb_tails) else ""
+                nhihop = logic.lay_nhi_hop(list(found), list(t1)+list(t2))
+                final_dan = sorted(set(dancham + nhihop))
 
-        col_cfg = {
-            "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-            "Bệt": st.column_config.TextColumn("Bệt", width="small"),
-            "Dàn": st.column_config.TextColumn("Dàn Nuôi", width="medium"),
-        }
-        for k in range(1, 8):
-            col_cfg[f"T{k}"] = st.column_config.TextColumn(f"{k}", width="small")
+            # 4. Check kết quả (F1 -> F10) tương tự ảnh
+            check_cols = {}
+            has_win_row = False
+            
+            # Check 15 ngày sau (F1...F15)
+            for k in range(1, 16):
+                chk_idx = i - k
+                val_chk = "0" # Mặc định là 0 (trượt)
+                
+                if chk_idx >= 0:
+                    res = gdb_tails[chk_idx]
+                    if final_dan and res in final_dan:
+                        val_chk = "1" # Trúng
+                        has_win_row = True
+                else:
+                    val_chk = "" # Chưa có KQ
+                
+                check_cols[f"F{k}"] = val_chk
 
-        st.dataframe(
-            df_bet.style.applymap(highlight_hits, subset=[f"T{k}" for k in range(1, 8)]),
-            column_config=col_cfg,
-            hide_index=True,
-            use_container_width=True
-        )
-    else:
-        st.info("Không có dữ liệu bệt.")
+            # 5. Đóng gói dòng
+            row_item = {
+                "date": shorten_date(curr['date']),
+                "A": nums[0], "B": nums[1], "C": nums[2], "D": nums[3], "E": nums[4],
+                "N1": curr['number'][-2:], # 2 số cuối
+                "Chạm": "".join(sorted(found)), # Hiển thị bệt gọn
+                "Bet": ",".join(sorted(found)),
+                "Dàn": " ".join(final_dan) if final_dan else "",
+                "WIN": has_win_row # Cờ để tô màu
+            }
+            row_item.update(check_cols)
+            rows.append(row_item)
+            
+        return pd.DataFrame(rows)
+
+    # Hàm tạo dataframe tổng hợp (Bên phải)
+    def create_summary_df(b_types):
+        # Gom dữ liệu 3 nguồn
+        srcs = [("ĐB", xsmb_show), ("G1", g1_show), ("TT", tt_show)]
+        
+        summary_rows = []
+        # Duyệt qua các ngày (dùng độ dài của xsmb làm chuẩn)
+        for i in range(len(xsmb_show)-1):
+            row_item = {"date": shorten_date(xsmb_show[i]['date'])}
+            
+            # Với mỗi nguồn, tìm số bệt
+            for name, data in srcs:
+                curr = data[i]
+                nxt = data[i+1]
+                
+                # Tìm riêng từng loại để tách cột (Phải/Thẳng/Trái) nếu muốn
+                # Nhưng trong ảnh là gộp chung vào cột nguồn
+                # Ở đây ta gộp chung các loại bệt đã chọn vào 1 cột cho mỗi nguồn
+                found = set()
+                for t in b_types:
+                    found.update(logic.tim_chu_so_bet(list(curr['number']), list(nxt['number']), t))
+                
+                row_item[name] = ",".join(sorted(found))
+            
+            summary_rows.append(row_item)
+        return pd.DataFrame(summary_rows)
+
+    # --- 3. HIỂN THỊ GIAO DIỆN CHIA ĐÔI ---
+    
+    # Tạo 2 cột: Trái (Rộng - Chi tiết) - Phải (Hẹp - Tổng hợp)
+    # Tỉ lệ 2:1 hoặc 3:1 tùy màn hình
+    col_left, col_right = st.columns([65, 35]) 
+
+    # === CỘT TRÁI: CHI TIẾT & CHECK ===
+    with col_left:
+        st.caption(f"📋 Chi tiết & Soi KQ nuôi ({target_src})")
+        df_detail = create_detail_df(target_src, bet_types)
+        
+        if not df_detail.empty:
+            # Tô màu dòng trúng (text đỏ) giống ảnh
+            def highlight_win_rows(row):
+                color = 'color: red; font-weight: bold;' if row['WIN'] else ''
+                return [color] * len(row)
+
+            # Cấu hình cột siêu nhỏ để giống excel
+            cfg_left = {
+                "date": st.column_config.TextColumn("Ngày", width="small"),
+                "A": st.column_config.TextColumn("A", width="small"),
+                "B": st.column_config.TextColumn("B", width="small"),
+                "C": st.column_config.TextColumn("C", width="small"),
+                "D": st.column_config.TextColumn("D", width="small"),
+                "E": st.column_config.TextColumn("E", width="small"),
+                "N1": st.column_config.TextColumn("N1", width="small"),
+                "Chạm": st.column_config.TextColumn("Chạm", width="small"),
+                "Bet": st.column_config.TextColumn("Bet", width="small"),
+                "Dàn": st.column_config.TextColumn("Dàn Nuôi", width="large"),
+                "WIN": st.column_config.Column("W", hidden=True), # Ẩn cột cờ
+            }
+            # Cấu hình F1-F15 nhỏ xíu
+            for k in range(1, 16):
+                cfg_left[f"F{k}"] = st.column_config.TextColumn(f"{k}", width="small")
+
+            # Hiển thị bảng trái
+            # Ẩn bớt cột nếu cần, ở đây hiển thị full như ảnh
+            st.dataframe(
+                df_detail.style.apply(highlight_win_rows, axis=1),
+                column_config=cfg_left,
+                hide_index=True,
+                use_container_width=True,
+                height=600
+            )
+
+    # === CỘT PHẢI: TỔNG HỢP 3 ĐÀI ===
+    with col_right:
+        st.caption("📑 Tổng hợp Chữ Số Bệt (3 Đài)")
+        df_summary = create_summary_df(bet_types)
+        
+        if not df_summary.empty:
+            # Style bảng tổng hợp
+            cfg_right = {
+                "date": st.column_config.TextColumn("Ngày", width="small"),
+                "ĐB": st.column_config.TextColumn("ĐB", width="small"),
+                "G1": st.column_config.TextColumn("G1", width="small"),
+                "TT": st.column_config.TextColumn("TT", width="small"),
+            }
+            
+            st.dataframe(
+                df_summary,
+                column_config=cfg_right,
+                hide_index=True,
+                use_container_width=True,
+                height=600
+            )
 
 # === TAB 4: THỐNG KÊ TOP GAN & COPY ===
 with tabs[3]:
@@ -467,4 +585,5 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
         else:
             st.warning("Không tìm thấy.")
+
 

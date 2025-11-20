@@ -14,10 +14,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS tối ưu cho cả Mobile và PC (bảng gọn, font vừa phải)
 st.markdown("""
 <style>
-    /* Tab gọn gàng */
     .stTabs [data-baseweb="tab-list"] { gap: 2px; }
     .stTabs [data-baseweb="tab"] { 
         height: 40px; 
@@ -30,13 +28,7 @@ st.markdown("""
         background-color: #ffffff; 
         border-top: 2px solid #ff4b4b; 
     }
-    
-    /* Thu nhỏ padding trong bảng để hiện được nhiều cột */
-    div[data-testid="stDataFrame"] td {
-        padding: 2px 4px !important;
-        font-size: 13px;
-    }
-    div[data-testid="stDataFrame"] th {
+    div[data-testid="stDataFrame"] td, div[data-testid="stDataFrame"] th {
         padding: 2px 4px !important;
         font-size: 13px;
     }
@@ -47,7 +39,6 @@ st.markdown("""
 # 2. HÀM HỖ TRỢ & DATA
 # ==============================================================================
 def shorten_date(date_str):
-    """Rút gọn ngày: 'Thứ Tư ngày 20-11-2025' -> '20/11'"""
     try:
         parts = date_str.split(" ")
         return parts[-1][:5]
@@ -62,7 +53,6 @@ def load_all_data(num_days):
     g1 = data_fetcher.fetch_giai_nhat(num_days, dt)
     return dt, tt, xsmb, g1
 
-# --- SIDEBAR ---
 with st.sidebar:
     st.title("🐔 SIÊU GÀ TOOL")
     days_fetch = st.number_input("Tải dữ liệu (ngày)", 50, 365, 100, step=50)
@@ -70,17 +60,15 @@ with st.sidebar:
     if st.button("🔄 Cập nhật dữ liệu"):
         st.cache_data.clear()
         st.rerun()
-    st.caption("Phiên bản v4.1 (Fixed)")
+    st.caption("Phiên bản v5.0 (Gan Full)")
 
-# --- LOAD DATA ---
 try:
     with st.spinner("Đang tải dữ liệu..."):
         full_dt, full_tt, full_xsmb, full_g1 = load_all_data(days_fetch)
 except Exception as e:
-    st.error(f"Lỗi kết nối hoặc xử lý dữ liệu: {e}")
+    st.error(f"Lỗi kết nối: {e}")
     st.stop()
 
-# Cắt dữ liệu theo số ngày hiển thị
 dt_show = full_dt[:days_show]
 tt_show = full_tt[:days_show]
 xsmb_show = full_xsmb[:days_show]
@@ -91,9 +79,7 @@ g1_show = full_g1[:days_show]
 # ==============================================================================
 tabs = st.tabs(["📊 Kết Quả", "🎯 Dàn Nuôi", "🎲 Bệt (Bet)", "📈 Thống Kê & Copy", "🔍 Dò Cầu"])
 
-# ------------------------------------------------------------------------------
-# TAB 1: KẾT QUẢ
-# ------------------------------------------------------------------------------
+# --- TAB 1: KẾT QUẢ ---
 with tabs[0]:
     c1, c2 = st.columns(2)
     with c1:
@@ -111,7 +97,6 @@ with tabs[0]:
             df_tt['date'] = df_tt['date'].apply(shorten_date)
             st.dataframe(df_tt, hide_index=True, use_container_width=True,
                          column_config={"date": st.column_config.TextColumn("Ngày", width="small"), "number":"Số"})
-    
     st.divider()
     c3, c4 = st.columns(2)
     with c3:
@@ -129,12 +114,9 @@ with tabs[0]:
             st.dataframe(df_g1, hide_index=True, use_container_width=True,
                          column_config={"date": st.column_config.TextColumn("Ngày", width="small"), "number":"Số"})
 
-# ------------------------------------------------------------------------------
-# TAB 2: DÀN NUÔI (CÓ MỨC SỐ)
-# ------------------------------------------------------------------------------
+# --- TAB 2: DÀN NUÔI (CHUẨN 21 NGÀY) ---
 with tabs[1]:
     st.caption("Phân Tích Dàn Nuôi & Mức Số")
-    
     c_src, c_type, c_filt = st.columns([1,1,2])
     source_comp = c_src.radio("So sánh:", ["GĐB", "G1"], horizontal=True)
     res_type = c_type.selectbox("Nguồn:", ["Thần tài", "Điện toán"])
@@ -156,7 +138,6 @@ with tabs[1]:
             combos = {a+b for a in digits for b in digits}
             if not include_dup: combos = {c for c in combos if c[0] != c[1]}
             if cham_filter: combos = {c for c in combos if cham_filter in c}
-            
             if not combos: continue
 
             check_range = 21
@@ -180,7 +161,8 @@ with tabs[1]:
             row.update(k_cols)
             results.append(row)
             
-            if hits == 0 and i <= 30: 
+            # --- LOGIC CHỐT CỨNG 21 NGÀY ---
+            if hits == 0 and i < 21: 
                 missed_str = " ".join(sorted(combos))
                 missed_patterns.append(f"📅 {shorten_date(dt_show[i]['date'])} ({val}): {missed_str}")
                 raw_missed_data.append(missed_str)
@@ -191,14 +173,12 @@ with tabs[1]:
             return f'background-color: {"#ffcccc" if val == "MISS" else "#ccffcc"}'
 
         if not df_res.empty:
-            # Cấu hình cột gọn gàng
             col_config = {
                 "Ngày": st.column_config.TextColumn("Ngày", width="small"),
                 "KQ": st.column_config.TextColumn("KQ", width="small"), 
                 "Dàn": st.column_config.TextColumn("Dàn Nuôi", width="medium"),
                 "TT": st.column_config.TextColumn("TT", width="small"),
             }
-            # Rename K1 -> 1 và ép nhỏ
             for k_col in [c for c in df_res.columns if c.startswith("K")]:
                 col_config[k_col] = st.column_config.TextColumn(k_col.replace("K", ""), width="small")
 
@@ -213,7 +193,7 @@ with tabs[1]:
             st.divider()
             c_warn, c_stat = st.columns([1, 1])
             with c_warn:
-                st.warning("⚠️ CẢNH BÁO: Dàn chưa nổ (30 ngày)")
+                st.warning("⚠️ CẢNH BÁO: Dàn chưa nổ (21 ngày gần nhất)")
                 st.text_area("Chi tiết:", "\n".join(missed_patterns), height=300)
             with c_stat:
                 st.info("📊 THỐNG KÊ MỨC SỐ")
@@ -234,31 +214,17 @@ with tabs[1]:
                         st.markdown(f"**Mức {lvl}** ({len(nums)} số): {', '.join(disp)}", unsafe_allow_html=True)
                     st.caption(f"*Số đỏ: Trùng với GĐB/G1 mới nhất ({latest_ref_val})*")
 
-# ------------------------------------------------------------------------------
-# TAB 3: BỆT (GIAO DIỆN TỐI ƯU SIÊU NHỎ)
-# ------------------------------------------------------------------------------
+# --- TAB 3: BỆT (PC STYLE) ---
 with tabs[2]:
     # 1. CSS ÉP CỘT BÉ LẠI
     st.markdown("""
     <style>
-        /* Ép font size 12px cho toàn bộ bảng */
-        div[data-testid="stDataFrame"] {
-            font-size: 12px !important;
-        }
-        /* Giảm padding của ô header và ô dữ liệu xuống tối đa */
-        div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td {
-            padding: 2px 1px !important; /* Padding trái phải 1px */
-        }
-        /* Ép độ rộng tối thiểu của cột nhỏ lại (hack vào class nội bộ của Streamlit) */
-        div[class*="stDataFrame"] div[role="columnheader"] {
-            min-width: 10px !important;
-            max-width: 30px !important; /* Giới hạn max width cho các cột nhỏ */
-            overflow: hidden;
-        }
+        div[data-testid="stDataFrame"] { font-size: 12px !important; }
+        div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td { padding: 2px 1px !important; }
+        div[class*="stDataFrame"] div[role="columnheader"] { min-width: 10px !important; max-width: 30px !important; overflow: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
-    # 2. CẤU HÌNH
     with st.container():
         c_cfg1, c_cfg2 = st.columns([1, 3])
         with c_cfg1:
@@ -277,7 +243,6 @@ with tabs[2]:
     st.divider()
     gdb_tails = [x['number'][-2:] for x in full_xsmb]
 
-    # 3. TẠO DATAFRAME TRÁI (CHI TIẾT)
     def create_detail_df(source_name, b_types):
         if source_name == "GĐB": src_data = xsmb_show
         elif source_name == "G1": src_data = g1_show
@@ -302,7 +267,6 @@ with tabs[2]:
                 nhihop = logic.lay_nhi_hop(list(found), list(t1)+list(t2))
                 final_dan = sorted(set(dancham + nhihop))
 
-            # Check F1-F15
             check_cols = {}
             has_win_row = False
             for k in range(1, 16):
@@ -330,7 +294,6 @@ with tabs[2]:
             rows.append(row_item)
         return pd.DataFrame(rows)
 
-    # 4. TẠO DATAFRAME PHẢI (TỔNG HỢP)
     def create_summary_df(b_types):
         srcs = [("ĐB", xsmb_show), ("G1", g1_show), ("TT", tt_show)]
         rows = []
@@ -345,8 +308,6 @@ with tabs[2]:
             rows.append(item)
         return pd.DataFrame(rows)
 
-    # 5. HIỂN THỊ CHIA CỘT
-    # Chia tỷ lệ 70% cho bảng trái, 30% cho bảng phải
     col_left, col_right = st.columns([7, 3]) 
 
     with col_left:
@@ -357,18 +318,13 @@ with tabs[2]:
                 c = 'color: red; font-weight: bold;' if row['WIN'] else ''
                 return [c]*len(row)
 
-            # Cấu hình cột
             cfg_left = {
-                "date": st.column_config.TextColumn("N", width="small"), # N: Ngày (viết tắt cho gọn)
-                "Dàn": st.column_config.TextColumn("Dàn", width="large"), # Dàn cần rộng
-                "WIN": None # Ẩn cột WIN
+                "date": st.column_config.TextColumn("N", width="small"),
+                "Dàn": st.column_config.TextColumn("Dàn", width="large"),
+                "WIN": None
             }
-            
-            # Ép tất cả các cột đơn lẻ (A-E, N1, F1-F15) về size "small"
             small_cols = ["A", "B", "C", "D", "E", "N1", "Chạm", "Bet"] + [f"F{k}" for k in range(1, 16)]
-            
             for col in small_cols:
-                # Nếu là cột F, đổi tên hiển thị thành số (F1 -> 1)
                 label = col.replace("F", "") if col.startswith("F") else col
                 cfg_left[col] = st.column_config.TextColumn(label, width="small")
 
@@ -376,7 +332,7 @@ with tabs[2]:
                 df_detail.style.apply(highlight_win, axis=1),
                 column_config=cfg_left,
                 hide_index=True,
-                use_container_width=False, # QUAN TRỌNG: False để bảng co lại, không giãn ra
+                use_container_width=False,
                 height=600
             )
 
@@ -390,17 +346,9 @@ with tabs[2]:
                 "G1": st.column_config.TextColumn("G1", width="small"),
                 "TT": st.column_config.TextColumn("TT", width="small"),
             }
-            st.dataframe(
-                df_summ, 
-                column_config=cfg_right, 
-                hide_index=True, 
-                use_container_width=False, # False để bảng co lại
-                height=600
-            )
+            st.dataframe(df_summ, column_config=cfg_right, hide_index=True, use_container_width=False, height=600)
 
-# ------------------------------------------------------------------------------
-# TAB 4: THỐNG KÊ & COPY
-# ------------------------------------------------------------------------------
+# --- TAB 4: THỐNG KÊ (ĐÃ THÊM ĐẦU/ĐUÔI) ---
 with tabs[3]:
     st.caption("Thống Kê Top Lâu Ra & Tạo Mẫu Copy")
     l2_src = st.radio("Nguồn:", ["GĐB", "G1"], horizontal=True, key="l2_src_radio")
@@ -420,22 +368,31 @@ with tabs[3]:
         }
 
     stats = []
+    # 1. Bộ
     stats.append(find_top_gan(all_tails, logic.bo, "Bộ", logic.get_bo_dan))
-    stats.append(find_top_gan(all_tails, logic.hieu, "Hiệu", logic.get_hieu_dan))
-    stats.append(find_top_gan(all_tails, logic.zodiac, "Con Giáp", logic.get_zodiac_dan))
+    # 2. Đầu (MỚI THÊM)
+    stats.append(find_top_gan(all_tails, lambda x: x[0], "Đầu", logic.get_dau_dan))
+    # 3. Đuôi (MỚI THÊM)
+    stats.append(find_top_gan(all_tails, lambda x: x[1], "Đuôi", logic.get_duoi_dan))
+    # 4. Tổng
     stats.append(find_top_gan(all_tails, lambda x: str((int(x[0])+int(x[1]))%10), "Tổng", logic.get_tong_dan))
+    # 5. Hiệu
+    stats.append(find_top_gan(all_tails, logic.hieu, "Hiệu", logic.get_hieu_dan))
+    # 6. Con Giáp
+    stats.append(find_top_gan(all_tails, logic.zodiac, "Con Giáp", logic.get_zodiac_dan))
+    # 7. Kép
     stats.append(find_top_gan(all_tails, logic.kep, "Kép", logic.get_kep_dan))
 
     c_text, c_table = st.columns([1, 1])
     with c_text:
-        st.info("📝 Mẫu văn bản")
+        st.info("📝 Mẫu văn bản (Copy)")
         txt_out = f"==== TOP GAN {l2_src} ({shorten_date(dt_show[0]['date'])}) ====\n\n"
         for item in stats:
             if item:
                 val_txt = logic.doc_so_chu(item['Giá trị']) if str(item['Giá trị']).isdigit() else str(item['Giá trị'])
                 txt_out += f"{item['Loại']}: {val_txt}\nDàn: {item['Dàn']}\nLâu ra: {item['Chữ']} ngày\n---\n"
         txt_out += "#xoso #thongke\n⛔ Chỉ mang tính chất tham khảo!"
-        st.text_area("Nội dung:", txt_out, height=400)
+        st.text_area("Nội dung:", txt_out, height=500)
 
     with c_table:
         st.success("🏆 Bảng Gan Tổng Hợp")
@@ -451,9 +408,7 @@ with tabs[3]:
         df_gan_nums = pd.DataFrame(gan_nums).sort_values("Gan", ascending=False).head(10)
         st.dataframe(df_gan_nums.T, use_container_width=True)
 
-# ------------------------------------------------------------------------------
-# TAB 5: DÒ CẦU
-# ------------------------------------------------------------------------------
+# --- TAB 5: DÒ CẦU ---
 with tabs[4]:
     st.caption("Công Cụ Dò Cầu")
     target = st.text_input("Nhập cặp số (VD: 68):", max_chars=2)
@@ -469,4 +424,3 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
         else:
             st.warning("Không tìm thấy.")
-

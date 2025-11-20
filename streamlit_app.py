@@ -397,80 +397,149 @@ with tabs[4]:
         else:
             st.warning("Không tìm thấy.")
 
-# --- TAB 6: TẦN SUẤT (MỚI) ---
+# ------------------------------------------------------------------------------
+# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - GIỐNG EXCEL
+# ------------------------------------------------------------------------------
 with tabs[5]:
-    st.caption("Phân Tích Tần Suất (Điện Toán)")
+    st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
     
-    # 1. Xử lý dữ liệu
+    # 1. Xử lý dữ liệu theo logic Nhóm Tần Suất
     freq_rows = []
-    all_pairs_for_grid = [] 
-
-    for item in dt_show:
-        date = shorten_date(item['date'])
-        # Gộp 3 cặp số điện toán thành chuỗi (VD: 84 28 43 -> "842843")
-        full_str = "".join(item['numbers'])
-        
-        # Lấy danh sách các cặp số để tính cho Bảng 2 (00-99)
-        all_pairs_for_grid.extend(item['numbers']) 
-
-        # Đếm 0-9 cho Bảng 1
-        counts = {str(k): full_str.count(str(k)) for k in range(10)}
-        
-        row = {"Ngày": date, "Kết Quả": " - ".join(item['numbers'])}
-        for k in range(10):
-            c = counts[str(k)]
-            row[str(k)] = c if c > 0 else "" # Số 0 để trống cho dễ nhìn
-        freq_rows.append(row)
-
-    # --- BẢNG 1: TẦN SUẤT 0-9 THEO NGÀY ---
-    st.markdown("##### 1. Tần suất chữ số 0-9 (Theo ngày)")
-    df_freq = pd.DataFrame(freq_rows)
     
-    # Cấu hình cột
-    freq_cfg = {
-        "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-        "Kết Quả": st.column_config.TextColumn("Kết Quả", width="medium")
-    }
-    for k in range(10):
-        freq_cfg[str(k)] = st.column_config.TextColumn(str(k), width="small")
-    
-    # Tô màu (Heatmap đơn giản)
-    def highlight_freq(val):
-        if isinstance(val, int):
-            if val >= 3: return 'background-color: #ff4b4b; color: white; font-weight: bold'
-            if val == 2: return 'background-color: #ffcccc; color: black'
-            if val == 1: return 'background-color: #f0f2f6; color: black'
-        return ''
+    # Cần ít nhất 7 ngày dữ liệu để tính
+    if len(dt_show) < 7:
+        st.warning("Cần ít nhất 7 ngày dữ liệu để tính tần suất.")
+    else:
+        # Duyệt từ ngày mới nhất -> cũ hơn
+        # Dừng trước 7 ngày cuối cùng vì không đủ khung
+        for i in range(len(dt_show) - 6):
+            current_day = dt_show[i]
+            date_str = shorten_date(current_day['date'])
+            
+            # Lấy KQ ngày hiện tại để hiển thị
+            kq_str = "".join(current_day['numbers'])
+            
+            # Lấy cửa sổ 7 ngày (từ i đến i+7)
+            # Vì list đang sort Mới -> Cũ, nên [i : i+7] là 7 ngày gần nhất tính từ ngày i
+            window_7_days = dt_show[i : i+7]
+            
+            # Gộp tất cả số của 7 ngày lại thành 1 chuỗi khổng lồ
+            merged_str = ""
+            for day in window_7_days:
+                merged_str += "".join(day['numbers'])
+            
+            # Đếm tần suất từng số 0-9
+            counts_map = {str(d): merged_str.count(str(d)) for d in range(10)}
+            
+            # Đảo ngược map: {Tần suất: [Danh sách số]}
+            # Ví dụ: {9 lần: ['1', '5'], 8 lần: ['3']}
+            freq_groups = {}
+            max_freq = 0 # Để xác định số cột cần vẽ
+            
+            for digit, count in counts_map.items():
+                freq_groups.setdefault(count, []).append(digit)
+                if count > max_freq: max_freq = count
+            
+            # Tạo dòng dữ liệu
+            row = {
+                "Ngày": date_str,
+                "KQ": kq_str
+            }
+            
+            # Điền vào các cột Tần suất (0, 1, 2...)
+            # Giới hạn hiển thị đến cột 15 (thường 7 ngày khó vượt quá 15 lần)
+            for f in range(16): 
+                digits = freq_groups.get(f, [])
+                # Sắp xếp và nối thành chuỗi "1,5"
+                row[str(f)] = ",".join(sorted(digits))
+            
+            freq_rows.append(row)
 
-    st.dataframe(
-        df_freq.style.applymap(highlight_freq, subset=[str(k) for k in range(10)]),
-        column_config=freq_cfg,
-        hide_index=True,
-        use_container_width=True
-    )
+        # --- HIỂN THỊ BẢNG ---
+        df_freq = pd.DataFrame(freq_rows)
+        
+        # Cấu hình cột
+        col_cfg = {
+            "Ngày": st.column_config.TextColumn("Ngày", width="small"),
+            "KQ": st.column_config.TextColumn("KQ/MỨC", width="medium"),
+        }
+        
+        # Cấu hình các cột tần suất 0-15 cho nhỏ lại
+        cols_to_style = []
+        for f in range(16):
+            col_name = str(f)
+            # Chỉ hiện những cột có dữ liệu (để bảng đỡ rộng nếu max freq nhỏ)
+            if col_name in df_freq.columns:
+                 # Nếu cột toàn rỗng thì có thể ẩn, nhưng để giữ form giống excel ta cứ hiện
+                col_cfg[col_name] = st.column_config.TextColumn(col_name, width="small")
+                cols_to_style.append(col_name)
+
+        # Tô màu:
+        # - Cột 0, 1 (Ít ra/Gan): Màu xám
+        # - Cột 2, 3, 4 (Trung bình): Màu trắng/đen
+        # - Cột 5, 6, 7... (Ra nhiều - Hot): Màu đỏ giống Excel
+        def highlight_cells(val):
+            if not val: return ''
+            return 'font-weight: bold' # Mặc định in đậm số
+
+        def highlight_cols(row):
+            styles = []
+            for col in row.index:
+                if col in ["Ngày", "KQ"]:
+                    styles.append("")
+                    continue
+                
+                try:
+                    freq = int(col)
+                    val = row[col]
+                    if not val:
+                        styles.append("")
+                        continue
+                        
+                    if freq == 0:
+                        styles.append('color: gray; font-style: italic;') # Gan (0 lần)
+                    elif freq >= 8:
+                        styles.append('color: #ff0000; font-weight: bold; background-color: #ffe6e6') # Rất Hot (Đỏ)
+                    elif freq >= 5:
+                        styles.append('color: #cc0000; font-weight: bold;') # Hot (Đỏ đậm)
+                    else:
+                        styles.append('color: black;') # Bình thường
+                except:
+                    styles.append("")
+            return styles
+
+        st.markdown("##### 🔢 Bảng Gom Nhóm Theo Tần Suất (7 Ngày)")
+        st.dataframe(
+            df_freq.style.apply(highlight_cols, axis=1),
+            column_config=col_cfg,
+            hide_index=True,
+            use_container_width=False, # Co bảng lại cho gọn
+            height=600
+        )
+        
+        st.caption("**Giải thích:** Cột số (0, 1, 2...) là số lần xuất hiện. Nội dung trong ô là các chữ số tương ứng. VD: Cột 9 có số '1,5' nghĩa là trong 7 ngày qua, số 1 và số 5 đã về 9 lần.")
 
     st.divider()
 
-    # --- BẢNG 2: HEATMAP 00-99 ---
-    st.markdown("##### 2. Tần suất cặp số 00-99 (Tổng hợp)")
-    
+    # --- PHẦN 2: HEATMAP 00-99 (GIỮ NGUYÊN VÌ HỮU ÍCH) ---
+    st.markdown("##### 🗺️ Bản đồ nhiệt cặp số 00-99 (Toàn bộ)")
+    # Tính lại toàn bộ để vẽ heatmap
+    all_nums_str = "".join(["".join(x['numbers']) for x in dt_show])
     from collections import Counter
-    pair_counts = Counter(all_pairs_for_grid)
-    
-    grid_data = []
-    for dau in range(10):
-        row_dict = {"Đầu": str(dau)}
-        for duoi in range(10):
-            pair = f"{dau}{duoi}"
-            row_dict[str(duoi)] = pair_counts.get(pair, 0)
-        grid_data.append(row_dict)
+    # Đếm cặp 2 số bất kỳ (sliding window style nếu cần, ở đây đếm cặp 00-99 có mặt)
+    pair_counts = {}
+    for i in range(100):
+        p = f"{i:02d}"
+        pair_counts[p] = all_nums_str.count(p)
         
-    df_grid = pd.DataFrame(grid_data)
-    df_grid.set_index("Đầu", inplace=True)
+    grid = []
+    for d in range(10):
+        r = {"Đầu": str(d)}
+        for u in range(10):
+            r[str(u)] = pair_counts.get(f"{d}{u}", 0)
+        grid.append(r)
     
     st.dataframe(
-        df_grid.style.background_gradient(cmap="YlOrRd", axis=None),
-        use_container_width=True,
-        height=450
+        pd.DataFrame(grid).set_index("Đầu").style.background_gradient(cmap="YlOrRd", axis=None),
+        use_container_width=True
     )
-    st.info("💡 Gợi ý: Bảng dưới đếm tổng số lần xuất hiện của các cặp số (VD: 84, 28, 43) trong toàn bộ khoảng thời gian hiển thị.")

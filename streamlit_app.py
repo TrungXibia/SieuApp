@@ -398,7 +398,7 @@ with tabs[4]:
             st.warning("Không tìm thấy.")
 
 # ------------------------------------------------------------------------------
-# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - CÓ CỘT GỘP TOP 3
+# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - TOP 3 THEO THỨ TỰ MỨC
 # ------------------------------------------------------------------------------
 with tabs[5]:
     st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
@@ -431,22 +431,25 @@ with tabs[5]:
                 "KQ/MỨC": kq_str
             }
             
-            # --- LOGIC MỚI: LẤY 3 MỨC CAO NHẤT ---
-            # Lấy danh sách các mức tần suất xuất hiện, sắp xếp từ cao xuống thấp
+            # --- LOGIC MỚI: GIỮ NGUYÊN THỨ TỰ MỨC ---
+            # 1. Lấy danh sách các mức tần suất, sắp xếp từ Cao -> Thấp
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             
-            # Lấy 3 mức đầu tiên (nếu có đủ)
+            # 2. Lấy 3 mức đầu tiên
             top_3_freqs = sorted_freqs[:3]
             
-            # Gom tất cả các số thuộc 3 mức này
-            top_digits = []
+            # 3. Tạo chuỗi hiển thị: Duyệt từng mức, gộp số trong mức đó lại
+            display_groups = []
             for f in top_3_freqs:
-                top_digits.extend(freq_groups[f])
+                digits = freq_groups[f]
+                # Sắp xếp nội bộ các số trong cùng 1 mức (VD: 7,6 -> 67)
+                digits_sorted = "".join(sorted(digits)) 
+                display_groups.append(digits_sorted)
             
-            # Sắp xếp lại các số gom được
-            row["TOP 3"] = ",".join(sorted(top_digits))
+            # 4. Nối các nhóm lại bằng dấu cách (VD: "4" + " " + "67" + " " + "123")
+            row["TOP 3"] = " ".join(display_groups)
             
-            # Điền các cột tần suất 0-15
+            # Điền các cột tần suất 0-15 (để hiển thị chi tiết bên cạnh)
             for f in range(16): 
                 digits = freq_groups.get(f, [])
                 row[str(f)] = ",".join(sorted(digits))
@@ -456,7 +459,7 @@ with tabs[5]:
         # --- HIỂN THỊ BẢNG ---
         df_freq = pd.DataFrame(freq_rows)
         
-        # Sắp xếp lại thứ tự cột: Ngày -> KQ -> 0..15 -> TOP 3
+        # Sắp xếp lại thứ tự cột
         cols_order = ["Ngày", "KQ/MỨC"] + [str(f) for f in range(16) if str(f) in df_freq.columns] + ["TOP 3"]
         df_freq = df_freq[cols_order]
 
@@ -464,10 +467,9 @@ with tabs[5]:
         col_cfg = {
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
             "KQ/MỨC": st.column_config.TextColumn("KQ", width="medium"),
-            "TOP 3": st.column_config.TextColumn("GỘP TOP 3", width="medium"), # Cột mới
+            "TOP 3": st.column_config.TextColumn("TOP 3 (Mức 1-2-3)", width="medium"),
         }
         
-        # Cấu hình các cột tần suất nhỏ
         for f in range(16):
             if str(f) in df_freq.columns:
                 col_cfg[str(f)] = st.column_config.TextColumn(str(f), width="small")
@@ -478,16 +480,15 @@ with tabs[5]:
             for col in row.index:
                 val = row[col]
                 
-                # Tô màu cột TOP 3 (Vàng giống Excel)
+                # Tô màu cột TOP 3 (Vàng đậm hơn chút để nổi bật)
                 if col == "TOP 3":
-                    styles.append('background-color: #ffffcc; color: red; font-weight: bold; border-left: 2px solid #ccc;')
+                    styles.append('background-color: #ffffcc; color: #d63031; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
                 
                 if col in ["Ngày", "KQ/MỨC"]:
                     styles.append("")
                     continue
                 
-                # Tô màu các cột tần suất
                 try:
                     freq = int(col)
                     if not val:
@@ -505,7 +506,7 @@ with tabs[5]:
                     styles.append("")
             return styles
 
-        st.markdown("##### 🔢 Bảng Gom Nhóm Tần Suất & Top 3 (7 Ngày)")
+        st.markdown("##### 🔢 Bảng Tần Suất & Top 3 Mức Cao Nhất")
         st.dataframe(
             df_freq.style.apply(highlight_cols, axis=1),
             column_config=col_cfg,
@@ -514,7 +515,7 @@ with tabs[5]:
             height=600
         )
         
-        st.caption("**Giải thích cột GỘP TOP 3:** Là tập hợp tất cả các chữ số thuộc 3 mức xuất hiện nhiều nhất trong dòng đó (Ví dụ dòng 1: Mức 11, Mức 8, Mức 6).")
+        st.caption("**Giải thích cột TOP 3:** Các nhóm số được sắp xếp theo mức độ xuất hiện giảm dần, phân cách bằng dấu cách. (VD: '4 67 123' nghĩa là số 4 ra nhiều nhất, tiếp theo là nhóm 6,7 và cuối cùng là nhóm 1,2,3).")
 
     st.divider()
 

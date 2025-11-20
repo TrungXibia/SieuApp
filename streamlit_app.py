@@ -441,7 +441,7 @@ with tabs[4]:
             st.warning("Không tìm thấy.")
 
 # ------------------------------------------------------------------------------
-# TAB 6: TẦN SUẤT (SỬA LỖI & NÂNG CẤP)
+# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - UPDATE TOP 2 CHO 00-99
 # ------------------------------------------------------------------------------
 with tabs[5]:
     st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
@@ -449,9 +449,12 @@ with tabs[5]:
     if len(dt_show) < 7:
         st.warning("Cần ít nhất 7 ngày dữ liệu để tính tần suất.")
     else:
-        # --- PHẦN 1: TẦN SUẤT 0-9 ---
+        # ==========================================================================
+        # PHẦN 1: TẦN SUẤT CHỮ SỐ 0-9 (VẪN GIỮ TOP 3)
+        # ==========================================================================
         st.markdown("##### 1. Tần suất chữ số 0-9")
         freq_rows_digits = []
+        
         for i in range(len(dt_show) - 6):
             current_day = dt_show[i]
             date_str = shorten_date(current_day['date'])
@@ -459,6 +462,7 @@ with tabs[5]:
             
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
+            
             counts_map = {str(d): merged_str.count(str(d)) for d in range(10)}
             
             freq_groups = {}
@@ -466,14 +470,18 @@ with tabs[5]:
                 freq_groups.setdefault(count, []).append(digit)
             
             row = {"Ngày": date_str, "KQ": kq_str}
+            
+            # TOP 3 CHO 0-9
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             top_3 = sorted_freqs[:3]
             disp_grps = []
             for f in top_3:
                 disp_grps.append("".join(sorted(freq_groups[f])))
             row["TOP 3"] = " ".join(disp_grps)
+            
             for f in range(16): 
                 row[str(f)] = ",".join(sorted(freq_groups.get(f, [])))
+            
             freq_rows_digits.append(row)
 
         df_digits = pd.DataFrame(freq_rows_digits)
@@ -513,9 +521,13 @@ with tabs[5]:
 
         st.divider()
 
-        # --- PHẦN 2: TẦN SUẤT 00-99 ---
+        # ==========================================================================
+        # PHẦN 2: TẦN SUẤT CẶP SỐ 00-99 (ĐÃ SỬA THÀNH TOP 2)
+        # ==========================================================================
         st.markdown("##### 2. Tần suất cặp số 00-99")
+        
         freq_rows_pairs = []
+        
         for i in range(len(dt_show) - 6):
             current_day = dt_show[i]
             date_str = shorten_date(current_day['date'])
@@ -536,14 +548,17 @@ with tabs[5]:
                 if count > max_freq: max_freq = count
             
             row = {"Ngày": date_str, "KQ": kq_short}
-            sorted_freqs = sorted(freq_groups.keys(), reverse=True)
-            top_3 = sorted_freqs[:2]
-            disp_grps = []
-            for f in top_3:
-                disp_grps.append(",".join(sorted(freq_groups[f])))
-            row["TOP 3"] = " | ".join(disp_grps)
             
-            limit_col = max(8, max_freq + 1)
+            # --- LOGIC MỚI: LẤY TOP 2 ---
+            sorted_freqs = sorted(freq_groups.keys(), reverse=True)
+            top_2 = sorted_freqs[:2] # Chỉ lấy 2 mức cao nhất
+            disp_grps = []
+            for f in top_2:
+                disp_grps.append(",".join(sorted(freq_groups[f])))
+            
+            row["TOP 2"] = " | ".join(disp_grps)
+            
+            limit_col = max(8, max_freq + 1) 
             for f in range(limit_col): 
                 pairs = freq_groups.get(f, [])
                 row[str(f)] = " ".join(sorted(pairs))
@@ -551,13 +566,15 @@ with tabs[5]:
             freq_rows_pairs.append(row)
 
         df_pairs = pd.DataFrame(freq_rows_pairs)
-        cols_p = ["Ngày", "KQ"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 3"]
+        
+        # Sắp xếp cột (Dùng TOP 2)
+        cols_p = ["Ngày", "KQ"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 2"]
         df_pairs = df_pairs[cols_p]
 
         col_cfg_pairs = {
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
             "KQ": st.column_config.TextColumn("Kết Quả", width="medium"),
-            "TOP 3": st.column_config.TextColumn("TOP 3 (00-99)", width="large"),
+            "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width="large"), # Đổi tên cột
         }
         for f in range(limit_col):
             if str(f) in df_pairs.columns:
@@ -567,7 +584,8 @@ with tabs[5]:
             styles = []
             for col in row.index:
                 val = row[col]
-                if col == "TOP 3":
+                # Tô màu cho cột TOP 2
+                if col == "TOP 2":
                     styles.append('background-color: #e6f7ff; color: #0050b3; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
                 if col in ["Ngày", "KQ"]:

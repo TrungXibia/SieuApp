@@ -13,24 +13,45 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+# CSS tối ưu cho cả Mobile và PC (Tương thích Dark Mode)
 st.markdown("""
 <style>
-    .stTabs [data-baseweb="tab-list"] { gap: 2px; }
+    /* 1. Tùy chỉnh Tabs: Dùng màu trong suốt để hợp với Dark Mode */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 5px; /* Khoảng cách giữa các tab */
+    }
     .stTabs [data-baseweb="tab"] { 
         height: 40px; 
-        padding: 5px 10px;
+        padding: 0px 15px;
         font-size: 14px;
-        background-color: #f0f2f6; 
-        border-radius: 4px 4px 0 0; 
+        border-radius: 5px;
+        background-color: transparent; /* Nền trong suốt */
+        border: 1px solid rgba(128, 128, 128, 0.2); /* Viền xám mờ */
     }
+    
+    /* Khi Tab được chọn */
     .stTabs [aria-selected="true"] { 
-        background-color: #ffffff; 
-        border-top: 2px solid #ff4b4b; 
+        background-color: rgba(255, 75, 75, 0.1); /* Nền đỏ rất nhạt */
+        border: 1px solid #ff4b4b; /* Viền đỏ */
+        color: #ff4b4b; /* Chữ màu đỏ */
+        font-weight: bold;
     }
-    div[data-testid="stDataFrame"] td, div[data-testid="stDataFrame"] th {
-        padding: 2px 4px !important;
+    
+    /* 2. Thu nhỏ padding trong bảng dữ liệu trên Mobile */
+    div[data-testid="stDataFrame"] td {
+        padding: 4px 8px !important;
         font-size: 13px;
+    }
+    div[data-testid="stDataFrame"] th {
+        padding: 4px 8px !important;
+        font-size: 13px;
+    }
+    
+    /* 3. Ẩn bớt khoảng trắng thừa ở đầu trang trên Mobile */
+    .block-container {
+        padding-top: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -424,3 +445,4 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
         else:
             st.warning("Không tìm thấy.")
+

@@ -327,68 +327,127 @@ with tabs[2]:
     else:
         st.info("Không có dữ liệu bệt.")
 
-# ==========================================
-# TAB 4: THỐNG KÊ GAN (ĐẦU/ĐUÔI/TỔNG/BỘ)
-# ==========================================
+# === TAB 4: THỐNG KÊ TOP GAN & COPY ===
 with tabs[3]:
-    st.caption("Thống Kê Gan & Lịch Sử")
-    l2_src = st.radio("Nguồn:", ["GĐB", "G1"], horizontal=True, key="l2_k")
+    st.caption("Thống Kê Top Lâu Ra & Tạo Mẫu Copy")
+    
+    # 1. Chọn nguồn
+    l2_src = st.radio("Nguồn dữ liệu:", ["GĐB", "G1"], horizontal=True, key="l2_src_radio")
     dat_l2 = full_xsmb if l2_src == "GĐB" else full_g1
-    all_tails = [x['number'][-2:] for x in dat_l2]
+    all_tails = [x['number'][-2:] for x in dat_l2] # Lấy toàn bộ lịch sử để tính gan chính xác
     
-    # Bảng lịch sử rút gọn
-    with st.expander("Xem lịch sử chi tiết", expanded=False):
-        rows_l2 = []
-        for x in dat_l2[:days_show]:
-            n = x['number'][-2:]
-            rows_l2.append({
-                "Ngày": shorten_date(x['date']),
-                "Số": n,
-                "Đ": n[0],
-                "Đu": n[1],
-                "T": (int(n[0])+int(n[1]))%10,
-                "B": logic.bo(n),
-            })
-        st.dataframe(pd.DataFrame(rows_l2), hide_index=True, use_container_width=True)
-    
-    st.markdown("#### 📊 Bảng Gan (Lâu chưa về)")
-    
-    def get_gan(extract_func, label, values=None):
+    # --- HÀM TÍNH TOP GAN ---
+    def find_top_gan(data_list, extract_func, label_name, get_dan_func):
+        """Tìm phần tử gan lớn nhất trong danh mục"""
         last_seen = {}
-        for idx, val in enumerate(all_tails):
+        # Duyệt từ mới nhất về quá khứ để tìm lần xuất hiện gần nhất
+        for idx, val in enumerate(data_list):
             k = extract_func(val)
-            if k not in last_seen: last_seen[k] = idx
+            if k not in last_seen:
+                last_seen[k] = idx # idx chính là số ngày gan
         
-        res = []
-        keys = values if values else last_seen.keys()
-        for k in keys:
-            d = last_seen.get(k, len(all_tails))
-            res.append({label: k, "Ngày": d})
-        return pd.DataFrame(res).sort_values("Ngày", ascending=False)
+        if not last_seen: return None
 
-    def hl_gan(val):
-        return 'color: red; font-weight: bold;' if isinstance(val, int) and val > 10 else ''
+        # Tìm cái nào gan lớn nhất
+        top_val = max(last_seen, key=last_seen.get)
+        days = last_seen[top_val]
+        
+        return {
+            "Loại": label_name,
+            "Giá trị": top_val,
+            "Số ngày": days,
+            "Chữ": logic.doc_so_chu(days),
+            "Dàn": get_dan_func(top_val)
+        }
 
-    range09 = [str(i) for i in range(10)]
+    # --- TÍNH TOÁN ---
+    stats = []
     
-    df_dau = get_gan(lambda x: x[0], "Đầu", range09)
-    df_duoi = get_gan(lambda x: x[1], "Đuôi", range09)
-    df_tong = get_gan(lambda x: str((int(x[0])+int(x[1]))%10), "Tổng", range09)
-    df_bo = get_gan(logic.bo, "Bộ").head(10)
+    # 1. Bộ
+    stats.append(find_top_gan(all_tails, logic.bo, "Bộ", logic.get_bo_dan))
+    # 2. Hiệu
+    stats.append(find_top_gan(all_tails, logic.hieu, "Hiệu", logic.get_hieu_dan))
+    # 3. Con Giáp
+    stats.append(find_top_gan(all_tails, logic.zodiac, "Con Giáp", logic.get_zodiac_dan))
+    # 4. Tổng
+    stats.append(find_top_gan(all_tails, lambda x: str((int(x[0])+int(x[1]))%10), "Tổng", logic.get_tong_dan))
+    # 5. Kép
+    stats.append(find_top_gan(all_tails, logic.kep, "Kép", logic.get_kep_dan))
 
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.info("Đầu Gan")
-        st.dataframe(df_dau.style.applymap(hl_gan, subset=['Ngày']), hide_index=True, use_container_width=True)
-    with c2:
-        st.info("Đuôi Gan")
-        st.dataframe(df_duoi.style.applymap(hl_gan, subset=['Ngày']), hide_index=True, use_container_width=True)
-    with c3:
-        st.success("Tổng Gan")
-        st.dataframe(df_tong.style.applymap(hl_gan, subset=['Ngày']), hide_index=True, use_container_width=True)
-    with c4:
-        st.warning("Bộ Gan")
-        st.dataframe(df_bo.style.applymap(hl_gan, subset=['Ngày']), hide_index=True, use_container_width=True)
+    # --- HIỂN THỊ ---
+    c_text, c_table = st.columns([1, 1])
+    
+    # CỘT TRÁI: VĂN BẢN COPY
+    with c_text:
+        st.info("📝 Mẫu văn bản (Copy)")
+        
+        text_output = "📊 Dữ liệu thống kê tham khảo xổ số – KHÔNG phải chốt số hay cá cược!\n\n"
+        if l2_src == "GĐB":
+            text_output += f"==== TOP LÂU RA NHẤT ĐẶC BIỆT ({shorten_date(dt_show[0]['date'])}) ====\n\n"
+        else:
+            text_output += f"==== TOP LÂU RA NHẤT GIẢI NHẤT ({shorten_date(dt_show[0]['date'])}) ====\n\n"
+        
+        for item in stats:
+            if item:
+                # Xử lý đọc tên giá trị (VD: Bộ 44 -> bộ bốn bốn)
+                val_read = str(item['Giá trị'])
+                if val_read.isdigit():
+                    val_read_text = logic.doc_so_chu(val_read)
+                else:
+                    val_read_text = val_read # Giữ nguyên chữ (VD: K.LECH, Mão)
+
+                text_output += f"{item['Loại']}: {val_read_text}\n"
+                text_output += f"Dàn: {item['Dàn']}\n"
+                text_output += f"Lâu ra: {item['Chữ']} ngày\n"
+                text_output += "-----------------------------\n\n"
+        
+        text_output += "#thongke #xoso #thongkexoso #statistical #lottery #thongkedeso\n\n"
+        text_output += "⛔ Không khuyến khích cá cược, không bán số, chỉ là thống kê!"
+        
+        st.text_area("Nội dung:", text_output, height=450)
+
+    # CỘT PHẢI: BẢNG TEST TỔNG HỢP
+    with c_table:
+        st.success("🏆 Bảng Test Tổng Hợp (Top Gan)")
+        
+        # Chuyển đổi list stats thành DataFrame
+        df_stats = pd.DataFrame([s for s in stats if s])
+        if not df_stats.empty:
+            # Sắp xếp lại cột
+            df_disp = df_stats[["Loại", "Giá trị", "Số ngày", "Dàn"]]
+            
+            st.dataframe(
+                df_disp,
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Loại": st.column_config.TextColumn("Danh Mục", width="small"),
+                    "Giá trị": st.column_config.TextColumn("Top Gan", width="small"),
+                    "Số ngày": st.column_config.NumberColumn("Gan (Ngày)", format="%d"),
+                    "Dàn": st.column_config.TextColumn("Dàn Số", width="medium"),
+                }
+            )
+            
+            st.markdown("---")
+            st.caption("**Giải thích bảng:**")
+            st.caption("- **Top Gan**: Giá trị (Bộ, Tổng...) lâu chưa về nhất tính đến hiện tại.")
+            st.caption("- **Gan (Ngày)**: Số ngày liên tiếp chưa xuất hiện.")
+            
+            # Thống kê thêm: 10 số đề gan nhất (để tham khảo thêm)
+            st.markdown("---")
+            st.markdown("#### ☠️ Top 10 Số Đề Gan Nhất")
+            
+            last_seen_num = {}
+            for idx, val in enumerate(all_tails):
+                if val not in last_seen_num: last_seen_num[val] = idx
+            
+            gan_nums = [{"Số": k, "Gan": v} for k,v in last_seen_num.items()]
+            df_gan_nums = pd.DataFrame(gan_nums).sort_values("Gan", ascending=False).head(10)
+            
+            st.dataframe(
+                df_gan_nums.T, # Chuyển ngang cho dễ nhìn trên mobile
+                use_container_width=True
+            )
 
 # ==========================================
 # TAB 5: DÒ CẦU
@@ -408,3 +467,4 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
         else:
             st.warning("Không tìm thấy.")
+

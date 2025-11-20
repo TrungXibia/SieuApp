@@ -347,7 +347,7 @@ with tabs[2]:
                 "Chạm": st.column_config.TextColumn("Chạm", width="small"),
                 "Bet": st.column_config.TextColumn("Bet", width="small"),
                 "Dàn": st.column_config.TextColumn("Dàn", width="large"),
-                "WIN": st.column_config.TextColumn("W", hidden=True) # Đã sửa lỗi TypeError
+                "WIN": None, # Đây là cách ẩn cột chuẩn nhất trong Streamlit
             }
             for k in range(1, 16):
                 cfg_left[f"F{k}"] = st.column_config.TextColumn(f"{k}", width="small")
@@ -443,3 +443,4 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
         else:
             st.warning("Không tìm thấy.")
+

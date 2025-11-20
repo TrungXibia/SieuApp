@@ -235,10 +235,30 @@ with tabs[1]:
                     st.caption(f"*Số đỏ: Trùng với GĐB/G1 mới nhất ({latest_ref_val})*")
 
 # ------------------------------------------------------------------------------
-# TAB 3: BỆT (PC STYLE - CHIA ĐÔI - ĐÃ FIX LỖI)
+# TAB 3: BỆT (GIAO DIỆN TỐI ƯU SIÊU NHỎ)
 # ------------------------------------------------------------------------------
 with tabs[2]:
-    # 1. Cấu hình
+    # 1. CSS ÉP CỘT BÉ LẠI
+    st.markdown("""
+    <style>
+        /* Ép font size 12px cho toàn bộ bảng */
+        div[data-testid="stDataFrame"] {
+            font-size: 12px !important;
+        }
+        /* Giảm padding của ô header và ô dữ liệu xuống tối đa */
+        div[data-testid="stDataFrame"] th, div[data-testid="stDataFrame"] td {
+            padding: 2px 1px !important; /* Padding trái phải 1px */
+        }
+        /* Ép độ rộng tối thiểu của cột nhỏ lại (hack vào class nội bộ của Streamlit) */
+        div[class*="stDataFrame"] div[role="columnheader"] {
+            min-width: 10px !important;
+            max-width: 30px !important; /* Giới hạn max width cho các cột nhỏ */
+            overflow: hidden;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 2. CẤU HÌNH
     with st.container():
         c_cfg1, c_cfg2 = st.columns([1, 3])
         with c_cfg1:
@@ -257,7 +277,7 @@ with tabs[2]:
     st.divider()
     gdb_tails = [x['number'][-2:] for x in full_xsmb]
 
-    # 2. Tạo Dataframe Trái
+    # 3. TẠO DATAFRAME TRÁI (CHI TIẾT)
     def create_detail_df(source_name, b_types):
         if source_name == "GĐB": src_data = xsmb_show
         elif source_name == "G1": src_data = g1_show
@@ -310,7 +330,7 @@ with tabs[2]:
             rows.append(row_item)
         return pd.DataFrame(rows)
 
-    # 3. Tạo Dataframe Phải
+    # 4. TẠO DATAFRAME PHẢI (TỔNG HỢP)
     def create_summary_df(b_types):
         srcs = [("ĐB", xsmb_show), ("G1", g1_show), ("TT", tt_show)]
         rows = []
@@ -325,44 +345,43 @@ with tabs[2]:
             rows.append(item)
         return pd.DataFrame(rows)
 
-    # 4. Hiển thị 2 cột
-    col_left, col_right = st.columns([65, 35]) 
+    # 5. HIỂN THỊ CHIA CỘT
+    # Chia tỷ lệ 70% cho bảng trái, 30% cho bảng phải
+    col_left, col_right = st.columns([7, 3]) 
 
     with col_left:
-        st.caption(f"📋 Chi tiết & Soi KQ ({target_src})")
+        st.caption(f"📋 Chi tiết ({target_src})")
         df_detail = create_detail_df(target_src, bet_types)
         if not df_detail.empty:
             def highlight_win(row):
                 c = 'color: red; font-weight: bold;' if row['WIN'] else ''
                 return [c]*len(row)
 
+            # Cấu hình cột
             cfg_left = {
-                "date": st.column_config.TextColumn("Ngày", width="small"),
-                "A": st.column_config.TextColumn("A", width="small"),
-                "B": st.column_config.TextColumn("B", width="small"),
-                "C": st.column_config.TextColumn("C", width="small"),
-                "D": st.column_config.TextColumn("D", width="small"),
-                "E": st.column_config.TextColumn("E", width="small"),
-                "N1": st.column_config.TextColumn("N1", width="small"),
-                "Chạm": st.column_config.TextColumn("Chạm", width="small"),
-                "Bet": st.column_config.TextColumn("Bet", width="small"),
-                "Dàn": st.column_config.TextColumn("Dàn", width="large"),
-                # --- SỬA LỖI Ở ĐÂY: ĐẶT LÀ NONE ĐỂ ẨN CỘT ---
-                "WIN": None 
+                "date": st.column_config.TextColumn("N", width="small"), # N: Ngày (viết tắt cho gọn)
+                "Dàn": st.column_config.TextColumn("Dàn", width="large"), # Dàn cần rộng
+                "WIN": None # Ẩn cột WIN
             }
-            for k in range(1, 16):
-                cfg_left[f"F{k}"] = st.column_config.TextColumn(f"{k}", width="small")
+            
+            # Ép tất cả các cột đơn lẻ (A-E, N1, F1-F15) về size "small"
+            small_cols = ["A", "B", "C", "D", "E", "N1", "Chạm", "Bet"] + [f"F{k}" for k in range(1, 16)]
+            
+            for col in small_cols:
+                # Nếu là cột F, đổi tên hiển thị thành số (F1 -> 1)
+                label = col.replace("F", "") if col.startswith("F") else col
+                cfg_left[col] = st.column_config.TextColumn(label, width="small")
 
             st.dataframe(
                 df_detail.style.apply(highlight_win, axis=1),
                 column_config=cfg_left,
                 hide_index=True,
-                use_container_width=True,
+                use_container_width=False, # QUAN TRỌNG: False để bảng co lại, không giãn ra
                 height=600
             )
 
     with col_right:
-        st.caption("📑 Tổng hợp (3 Đài)")
+        st.caption("📑 Tổng hợp")
         df_summ = create_summary_df(bet_types)
         if not df_summ.empty:
             cfg_right = {
@@ -371,7 +390,13 @@ with tabs[2]:
                 "G1": st.column_config.TextColumn("G1", width="small"),
                 "TT": st.column_config.TextColumn("TT", width="small"),
             }
-            st.dataframe(df_summ, column_config=cfg_right, hide_index=True, use_container_width=True, height=600)
+            st.dataframe(
+                df_summ, 
+                column_config=cfg_right, 
+                hide_index=True, 
+                use_container_width=False, # False để bảng co lại
+                height=600
+            )
 
 # ------------------------------------------------------------------------------
 # TAB 4: THỐNG KÊ & COPY
@@ -444,3 +469,4 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
         else:
             st.warning("Không tìm thấy.")
+

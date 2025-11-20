@@ -4,71 +4,7 @@ import logic
 import data_fetcher
 from collections import Counter
 
-# ==============================================================================
-# 1. CẤU HÌNH & CSS (MENU STYLE HIỆN ĐẠI)
-# ==============================================================================
-st.set_page_config(
-    page_title="SIÊU GÀ APP",
-    page_icon="🐔",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
-st.markdown("""
-<style>
-    /* --- MENU STYLE (PILLS) --- */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px; /* Khoảng cách giữa các tab */
-        background-color: transparent;
-        padding-bottom: 10px;
-    }
-
-    /* Tab chưa chọn (Inactive) */
-    .stTabs [data-baseweb="tab"] {
-        height: 40px;
-        padding: 0 15px;
-        font-size: 14px;
-        font-weight: 500;
-        border-radius: 20px; /* Bo tròn kiểu viên thuốc */
-        background-color: rgba(150, 150, 150, 0.1); /* Nền xám mờ */
-        border: 1px solid rgba(150, 150, 150, 0.2); /* Viền mờ */
-        color: inherit; /* Màu chữ tự động theo theme */
-        transition: all 0.3s;
-    }
-
-    /* Tab đang chọn (Active) */
-    .stTabs [aria-selected="true"] {
-        background-color: #ff4b4b !important; /* Nền Đỏ Streamlit */
-        color: #ffffff !important; /* Chữ Trắng tuyệt đối */
-        font-weight: bold;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Đổ bóng nhẹ */
-    }
-
-    /* Hover hiệu ứng */
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: rgba(255, 75, 75, 0.1);
-        border-color: #ff4b4b;
-    }
-    
-    /* --- BẢNG DỮ LIỆU (COMPACT) --- */
-    div[data-testid="stDataFrame"] td {
-        padding: 4px 6px !important;
-        font-size: 13px;
-    }
-    div[data-testid="stDataFrame"] th {
-        padding: 4px 6px !important;
-        font-size: 13px;
-    }
-    
-    /* Ẩn khoảng trắng thừa trên mobile */
-    .block-container {
-        padding-top: 1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # ==============================================================================
 # 2. HÀM HỖ TRỢ & DATA
@@ -570,3 +506,4 @@ with tabs[5]:
             return styles
 
         st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=False)
+

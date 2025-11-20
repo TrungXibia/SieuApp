@@ -5,7 +5,7 @@ import data_fetcher
 from collections import Counter
 
 # ==============================================================================
-# 1. CẤU HÌNH & CSS
+# 1. CẤU HÌNH & CSS (MENU STYLE HIỆN ĐẠI)
 # ==============================================================================
 st.set_page_config(
     page_title="SIÊU GÀ APP",
@@ -16,28 +16,56 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Tab gọn gàng */
-    .stTabs [data-baseweb="tab-list"] { gap: 2px; }
-    .stTabs [data-baseweb="tab"] { 
-        height: 40px; 
-        padding: 5px 10px;
-        font-size: 14px;
-        background-color: #f0f2f6; 
-        border-radius: 4px 4px 0 0; 
+    /* --- MENU STYLE (PILLS) --- */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px; /* Khoảng cách giữa các tab */
+        background-color: transparent;
+        padding-bottom: 10px;
     }
-    .stTabs [aria-selected="true"] { 
-        background-color: #ffffff; 
-        border-top: 2px solid #ff4b4b; 
+
+    /* Tab chưa chọn (Inactive) */
+    .stTabs [data-baseweb="tab"] {
+        height: 40px;
+        padding: 0 15px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 20px; /* Bo tròn kiểu viên thuốc */
+        background-color: rgba(150, 150, 150, 0.1); /* Nền xám mờ */
+        border: 1px solid rgba(150, 150, 150, 0.2); /* Viền mờ */
+        color: inherit; /* Màu chữ tự động theo theme */
+        transition: all 0.3s;
+    }
+
+    /* Tab đang chọn (Active) */
+    .stTabs [aria-selected="true"] {
+        background-color: #ff4b4b !important; /* Nền Đỏ Streamlit */
+        color: #ffffff !important; /* Chữ Trắng tuyệt đối */
+        font-weight: bold;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Đổ bóng nhẹ */
+    }
+
+    /* Hover hiệu ứng */
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(255, 75, 75, 0.1);
+        border-color: #ff4b4b;
     }
     
-    /* Thu nhỏ padding trong bảng để hiện được nhiều cột */
+    /* --- BẢNG DỮ LIỆU (COMPACT) --- */
     div[data-testid="stDataFrame"] td {
-        padding: 2px 4px !important;
+        padding: 4px 6px !important;
         font-size: 13px;
     }
     div[data-testid="stDataFrame"] th {
-        padding: 2px 4px !important;
+        padding: 4px 6px !important;
         font-size: 13px;
+    }
+    
+    /* Ẩn khoảng trắng thừa trên mobile */
+    .block-container {
+        padding-top: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -46,7 +74,6 @@ st.markdown("""
 # 2. HÀM HỖ TRỢ & DATA
 # ==============================================================================
 def shorten_date(date_str):
-    """Rút gọn ngày: 'Thứ Tư ngày 20-11-2025' -> '20/11'"""
     try:
         parts = date_str.split(" ")
         return parts[-1][:5]
@@ -69,17 +96,16 @@ with st.sidebar:
     if st.button("🔄 Cập nhật dữ liệu"):
         st.cache_data.clear()
         st.rerun()
-    st.caption("Phiên bản v5.2 (Final Fix)")
+    st.caption("Phiên bản v7.0 (New UI)")
 
 # --- LOAD DATA ---
 try:
     with st.spinner("Đang tải dữ liệu..."):
         full_dt, full_tt, full_xsmb, full_g1 = load_all_data(days_fetch)
 except Exception as e:
-    st.error(f"Lỗi kết nối hoặc xử lý dữ liệu: {e}")
+    st.error(f"Lỗi kết nối: {e}")
     st.stop()
 
-# Cắt dữ liệu theo số ngày hiển thị
 dt_show = full_dt[:days_show]
 tt_show = full_tt[:days_show]
 xsmb_show = full_xsmb[:days_show]
@@ -110,7 +136,6 @@ with tabs[0]:
             df_tt['date'] = df_tt['date'].apply(shorten_date)
             st.dataframe(df_tt, hide_index=True, use_container_width=True,
                          column_config={"date": st.column_config.TextColumn("Ngày", width="small"), "number":"Số"})
-    
     st.divider()
     c3, c4 = st.columns(2)
     with c3:
@@ -129,11 +154,10 @@ with tabs[0]:
                          column_config={"date": st.column_config.TextColumn("Ngày", width="small"), "number":"Số"})
 
 # ------------------------------------------------------------------------------
-# TAB 2: DÀN NUÔI (CÓ MỨC SỐ - 21 NGÀY)
+# TAB 2: DÀN NUÔI (21 NGÀY)
 # ------------------------------------------------------------------------------
 with tabs[1]:
     st.caption("Phân Tích Dàn Nuôi & Mức Số")
-    
     c_src, c_type, c_filt = st.columns([1,1,2])
     source_comp = c_src.radio("So sánh:", ["GĐB", "G1"], horizontal=True)
     res_type = c_type.selectbox("Nguồn:", ["Thần tài", "Điện toán"])
@@ -155,13 +179,11 @@ with tabs[1]:
             combos = {a+b for a in digits for b in digits}
             if not include_dup: combos = {c for c in combos if c[0] != c[1]}
             if cham_filter: combos = {c for c in combos if cham_filter in c}
-            
             if not combos: continue
 
             check_range = 21
             k_cols = {}
             hits = 0
-            
             for k in range(1, check_range + 1):
                 check_idx = i - k
                 val_ref = ""
@@ -179,16 +201,13 @@ with tabs[1]:
             row.update(k_cols)
             results.append(row)
             
-            # Logic chốt cứng 21 ngày
             if hits == 0 and i < 21: 
                 missed_str = " ".join(sorted(combos))
                 missed_patterns.append(f"📅 {shorten_date(dt_show[i]['date'])} ({val}): {missed_str}")
                 raw_missed_data.append(missed_str)
 
         df_res = pd.DataFrame(results)
-        
-        def color_status(val):
-            return f'background-color: {"#ffcccc" if val == "MISS" else "#ccffcc"}'
+        def color_status(val): return f'background-color: {"#ffcccc" if val == "MISS" else "#ccffcc"}'
 
         if not df_res.empty:
             col_config = {
@@ -200,12 +219,7 @@ with tabs[1]:
             for k_col in [c for c in df_res.columns if c.startswith("K")]:
                 col_config[k_col] = st.column_config.TextColumn(k_col.replace("K", ""), width="small")
 
-            st.dataframe(
-                df_res.style.applymap(color_status, subset=['TT']),
-                column_config=col_config,
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(df_res.style.applymap(color_status, subset=['TT']), column_config=col_config, use_container_width=True, hide_index=True)
         
         if missed_patterns:
             st.divider()
@@ -220,22 +234,17 @@ with tabs[1]:
                     counts = Counter(all_nums)
                     levels = {}
                     for num, freq in counts.items(): levels.setdefault(freq, []).append(num)
-                    
                     for lvl in sorted(levels.keys(), reverse=True):
                         nums = sorted(levels[lvl])
-                        disp = []
-                        for n in nums:
-                            if n == latest_ref_val:
-                                disp.append(f"<span style='color:red; font-weight:bold; border:1px solid red; padding:2px'>{n}</span>")
-                            else:
-                                disp.append(n)
+                        disp = [f"<span style='color:red; font-weight:bold; border:1px solid red; padding:2px'>{n}</span>" if n==latest_ref_val else n for n in nums]
                         st.markdown(f"**Mức {lvl}** ({len(nums)} số): {', '.join(disp)}", unsafe_allow_html=True)
                     st.caption(f"*Số đỏ: Trùng với GĐB/G1 mới nhất ({latest_ref_val})*")
 
 # ------------------------------------------------------------------------------
-# TAB 3: BỆT (PC STYLE - CHIA ĐÔI)
+# TAB 3: BỆT
 # ------------------------------------------------------------------------------
 with tabs[2]:
+    # CSS ÉP CỘT BÉ LẠI
     st.markdown("""
     <style>
         div[data-testid="stDataFrame"] { font-size: 12px !important; }
@@ -266,18 +275,15 @@ with tabs[2]:
         if source_name == "GĐB": src_data = xsmb_show
         elif source_name == "G1": src_data = g1_show
         else: src_data = tt_show
-        
         rows = []
         for i in range(len(src_data)-1):
             curr, nxt = src_data[i], src_data[i+1]
             nums = list(curr['number'])
             if len(nums) < 5: nums = ['']*(5-len(nums)) + nums
             else: nums = nums[-5:]
-            
             found = set()
             for t in b_types:
                 found.update(logic.tim_chu_so_bet(list(curr['number']), list(nxt['number']), t))
-            
             final_dan = []
             if found:
                 dancham = logic.lay_dan_cham(list(found))
@@ -285,7 +291,6 @@ with tabs[2]:
                 t2 = gdb_tails[i+1] if i+1 < len(gdb_tails) else ""
                 nhihop = logic.lay_nhi_hop(list(found), list(t1)+list(t2))
                 final_dan = sorted(set(dancham + nhihop))
-
             check_cols = {}
             has_win_row = False
             for k in range(1, 16):
@@ -294,12 +299,9 @@ with tabs[2]:
                 if chk_idx >= 0:
                     res = gdb_tails[chk_idx]
                     if final_dan and res in final_dan:
-                        val_chk = "1"
-                        has_win_row = True
-                else:
-                    val_chk = ""
+                        val_chk = "1"; has_win_row = True
+                else: val_chk = ""
                 check_cols[f"F{k}"] = val_chk
-
             row_item = {
                 "date": shorten_date(curr['date']),
                 "A": nums[0], "B": nums[1], "C": nums[2], "D": nums[3], "E": nums[4],
@@ -328,7 +330,6 @@ with tabs[2]:
         return pd.DataFrame(rows)
 
     col_left, col_right = st.columns([7, 3]) 
-
     with col_left:
         st.caption(f"📋 Chi tiết ({target_src})")
         df_detail = create_detail_df(target_src, bet_types)
@@ -336,7 +337,6 @@ with tabs[2]:
             def highlight_win(row):
                 c = 'color: red; font-weight: bold;' if row['WIN'] else ''
                 return [c]*len(row)
-
             cfg_left = {
                 "date": st.column_config.TextColumn("N", width="small"),
                 "Dàn": st.column_config.TextColumn("Dàn", width="large"),
@@ -346,14 +346,7 @@ with tabs[2]:
             for col in small_cols:
                 label = col.replace("F", "") if col.startswith("F") else col
                 cfg_left[col] = st.column_config.TextColumn(label, width="small")
-
-            st.dataframe(
-                df_detail.style.apply(highlight_win, axis=1),
-                column_config=cfg_left,
-                hide_index=True,
-                use_container_width=False,
-                height=600
-            )
+            st.dataframe(df_detail.style.apply(highlight_win, axis=1), column_config=cfg_left, hide_index=True, use_container_width=False, height=600)
 
     with col_right:
         st.caption("📑 Tổng hợp")
@@ -368,7 +361,7 @@ with tabs[2]:
             st.dataframe(df_summ, column_config=cfg_right, hide_index=True, use_container_width=False, height=600)
 
 # ------------------------------------------------------------------------------
-# TAB 4: THỐNG KÊ (ĐẦU, ĐUÔI, TỔNG, BỘ, HIỆU...)
+# TAB 4: THỐNG KÊ
 # ------------------------------------------------------------------------------
 with tabs[3]:
     st.caption("Thống Kê Top Lâu Ra & Tạo Mẫu Copy")
@@ -422,9 +415,7 @@ with tabs[3]:
         df_gan_nums = pd.DataFrame(gan_nums).sort_values("Gan", ascending=False).head(10)
         st.dataframe(df_gan_nums.T, use_container_width=True)
 
-# ------------------------------------------------------------------------------
-# TAB 5: DÒ CẦU
-# ------------------------------------------------------------------------------
+# --- TAB 5: DÒ CẦU ---
 with tabs[4]:
     st.caption("Công Cụ Dò Cầu")
     target = st.text_input("Nhập cặp số (VD: 68):", max_chars=2)
@@ -441,7 +432,7 @@ with tabs[4]:
             st.warning("Không tìm thấy.")
 
 # ------------------------------------------------------------------------------
-# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - UPDATE TOP 2 CHO 00-99
+# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY)
 # ------------------------------------------------------------------------------
 with tabs[5]:
     st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
@@ -449,9 +440,7 @@ with tabs[5]:
     if len(dt_show) < 7:
         st.warning("Cần ít nhất 7 ngày dữ liệu để tính tần suất.")
     else:
-        # ==========================================================================
-        # PHẦN 1: TẦN SUẤT CHỮ SỐ 0-9 (VẪN GIỮ TOP 3)
-        # ==========================================================================
+        # 1. TẦN SUẤT 0-9 (TOP 3)
         st.markdown("##### 1. Tần suất chữ số 0-9")
         freq_rows_digits = []
         
@@ -459,10 +448,8 @@ with tabs[5]:
             current_day = dt_show[i]
             date_str = shorten_date(current_day['date'])
             kq_str = "".join(current_day['numbers'])
-            
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
-            
             counts_map = {str(d): merged_str.count(str(d)) for d in range(10)}
             
             freq_groups = {}
@@ -470,8 +457,6 @@ with tabs[5]:
                 freq_groups.setdefault(count, []).append(digit)
             
             row = {"Ngày": date_str, "KQ": kq_str}
-            
-            # TOP 3 CHO 0-9
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             top_3 = sorted_freqs[:3]
             disp_grps = []
@@ -481,7 +466,6 @@ with tabs[5]:
             
             for f in range(16): 
                 row[str(f)] = ",".join(sorted(freq_groups.get(f, [])))
-            
             freq_rows_digits.append(row)
 
         df_digits = pd.DataFrame(freq_rows_digits)
@@ -497,45 +481,38 @@ with tabs[5]:
             if str(f) in df_digits.columns:
                 col_cfg_digits[str(f)] = st.column_config.TextColumn(str(f), width="small")
 
-        def highlight_cols(row):
+        def highlight_cols_digits(row):
             styles = []
             for col in row.index:
                 val = row[col]
                 if col == "TOP 3":
                     styles.append('background-color: #ffffcc; color: #d63031; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
-                if col in ["Ngày", "KQ"]:
-                    styles.append("")
-                    continue
+                if col in ["Ngày", "KQ"]: styles.append(""); continue
                 try:
                     freq = int(col)
                     if not val: styles.append("")
-                    elif freq == 0: styles.append('color: gray; font-style: italic;')
-                    elif freq >= 8: styles.append('color: #ff0000; font-weight: bold; background-color: #ffe6e6')
-                    elif freq >= 5: styles.append('color: #cc0000; font-weight: bold;')
-                    else: styles.append('color: black;')
+                    elif freq == 0: styles.append('color: #808080; font-style: italic;')
+                    elif freq >= 8: styles.append('background-color: #ff4b4b; color: #ffffff; font-weight: bold;')
+                    elif freq >= 5: styles.append('background-color: #ffcccc; color: #000000; font-weight: bold;')
+                    else: styles.append('')
                 except: styles.append("")
             return styles
 
-        st.dataframe(df_digits.style.apply(highlight_cols, axis=1), column_config=col_cfg_digits, hide_index=True, use_container_width=False)
+        st.dataframe(df_digits.style.apply(highlight_cols_digits, axis=1), column_config=col_cfg_digits, hide_index=True, use_container_width=False)
 
         st.divider()
 
-        # ==========================================================================
-        # PHẦN 2: TẦN SUẤT CẶP SỐ 00-99 (ĐÃ SỬA THÀNH TOP 2)
-        # ==========================================================================
+        # 2. TẦN SUẤT 00-99 (TOP 2)
         st.markdown("##### 2. Tần suất cặp số 00-99")
         
         freq_rows_pairs = []
-        
         for i in range(len(dt_show) - 6):
             current_day = dt_show[i]
             date_str = shorten_date(current_day['date'])
             kq_short = " ".join(current_day['numbers']) 
-            
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
-            
             counts_map = {}
             for num in range(100):
                 pair = f"{num:02d}"
@@ -548,33 +525,27 @@ with tabs[5]:
                 if count > max_freq: max_freq = count
             
             row = {"Ngày": date_str, "KQ": kq_short}
-            
-            # --- LOGIC MỚI: LẤY TOP 2 ---
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
-            top_2 = sorted_freqs[:2] # Chỉ lấy 2 mức cao nhất
+            top_2 = sorted_freqs[:2]
             disp_grps = []
             for f in top_2:
                 disp_grps.append(",".join(sorted(freq_groups[f])))
-            
             row["TOP 2"] = " | ".join(disp_grps)
             
-            limit_col = max(8, max_freq + 1) 
+            limit_col = max(8, max_freq + 1)
             for f in range(limit_col): 
                 pairs = freq_groups.get(f, [])
                 row[str(f)] = " ".join(sorted(pairs))
-            
             freq_rows_pairs.append(row)
 
         df_pairs = pd.DataFrame(freq_rows_pairs)
-        
-        # Sắp xếp cột (Dùng TOP 2)
         cols_p = ["Ngày", "KQ"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 2"]
         df_pairs = df_pairs[cols_p]
 
         col_cfg_pairs = {
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
             "KQ": st.column_config.TextColumn("Kết Quả", width="medium"),
-            "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width="large"), # Đổi tên cột
+            "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width="large"),
         }
         for f in range(limit_col):
             if str(f) in df_pairs.columns:
@@ -584,22 +555,18 @@ with tabs[5]:
             styles = []
             for col in row.index:
                 val = row[col]
-                # Tô màu cho cột TOP 2
                 if col == "TOP 2":
                     styles.append('background-color: #e6f7ff; color: #0050b3; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
-                if col in ["Ngày", "KQ"]:
-                    styles.append("")
-                    continue
+                if col in ["Ngày", "KQ"]: styles.append(""); continue
                 try:
                     freq = int(col)
                     if not val: styles.append("")
-                    elif freq == 0: styles.append('color: gray; font-style: italic;')
-                    elif freq >= 4: styles.append('color: #ff0000; font-weight: bold; background-color: #ffe6e6')
-                    elif freq >= 2: styles.append('color: #cc0000; font-weight: bold;')
-                    else: styles.append('color: black;')
+                    elif freq == 0: styles.append('color: #808080; font-style: italic;')
+                    elif freq >= 4: styles.append('background-color: #ff4b4b; color: #ffffff; font-weight: bold;')
+                    elif freq >= 2: styles.append('background-color: #ffcccc; color: #000000; font-weight: bold;')
+                    else: styles.append('')
                 except: styles.append("")
             return styles
 
         st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=False)
-

@@ -176,7 +176,7 @@ with tabs[1]:
             st.dataframe(
                 df_res.style.applymap(color_status, subset=['Trạng thái']),
                 column_config=col_config,
-                use_container_width=True,
+                use_container_width=False,
                 hide_index=True
             )
         
@@ -335,3 +335,4 @@ with tabs[4]:
             st.dataframe(pd.DataFrame(found), use_container_width=True)
         else:
             st.warning("Không tìm thấy trong phạm vi dữ liệu.")
+

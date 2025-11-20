@@ -103,7 +103,11 @@ with tabs[1]:
         ref_data = full_xsmb if source_comp == "GĐB" else full_g1
         
         results = []
-        missed_patterns = [] # Dàn chưa ra
+        missed_patterns = [] # Dàn chưa ra (để hiển thị text)
+        raw_missed_data = [] # Dàn chưa ra (dữ liệu thô để tính mức)
+
+        # Lấy giá trị GĐB/G1 ngày mới nhất để so sánh (tô đỏ)
+        latest_ref_val = ref_data[0]["number"][-2:] if ref_data else ""
 
         for i in range(len(source_list)):
             val = source_list[i]
@@ -117,9 +121,6 @@ with tabs[1]:
             if not combos: continue
 
             # Kiểm tra kết quả (21 ngày tiếp theo - tức là index nhỏ hơn trong list)
-            # Lưu ý: List đang sort Mới -> Cũ. i là hiện tại.
-            # Check xem dàn này có nổ ở các ngày SAU đó không (index < i)
-            
             check_range = 21 # Khung nuôi
             k_cols = {}
             hits = 0
@@ -143,12 +144,15 @@ with tabs[1]:
             row.update(k_cols)
             results.append(row)
             
-            if hits == 0 and i <= 30: # Chỉ báo động các ngày gần đây
-                missed_patterns.append(f"{dt_show[i]['date']} ({val}): " + " ".join(sorted(combos)))
+            # Chỉ lấy dữ liệu chưa nổ trong khoảng 30 ngày gần nhất để tính mức
+            if hits == 0 and i <= 30: 
+                missed_str = " ".join(sorted(combos))
+                missed_patterns.append(f"📅 {dt_show[i]['date']} (KQ: {val}): {missed_str}")
+                raw_missed_data.append(missed_str)
 
         df_res = pd.DataFrame(results)
         
-        # Hiển thị
+        # Hiển thị Bảng kết quả
         def color_status(val):
             color = '#ffcccc' if val == "CHƯA NỔ" else '#ccffcc'
             return f'background-color: {color}'
@@ -156,9 +160,48 @@ with tabs[1]:
         if not df_res.empty:
             st.dataframe(df_res.style.applymap(color_status, subset=['Trạng thái']), use_container_width=True)
         
+        # --- PHẦN CẢNH BÁO VÀ TÍNH MỨC SỐ ---
         if missed_patterns:
-            st.warning("⚠️ CẢNH BÁO: Các dàn đang nuôi chưa nổ (Khung 21 ngày gần nhất):")
-            st.text("\n".join(missed_patterns))
+            st.divider()
+            c_warn, c_stat = st.columns([1, 1])
+            
+            with c_warn:
+                st.warning("⚠️ CẢNH BÁO: Các dàn chưa nổ (30 ngày gần nhất)")
+                st.text_area("Chi tiết:", "\n".join(missed_patterns), height=300)
+            
+            with c_stat:
+                st.info("📊 THỐNG KÊ MỨC SỐ (TỪ CÁC DÀN CHƯA NỔ)")
+                
+                # Logic tính mức số
+                if raw_missed_data:
+                    from collections import Counter
+                    # Gom tất cả số thành 1 chuỗi rồi tách ra
+                    all_nums = " ".join(raw_missed_data).split()
+                    counts = Counter(all_nums)
+                    
+                    # Gom nhóm theo tần suất (Mức)
+                    levels = {}
+                    for num, freq in counts.items():
+                        levels.setdefault(freq, []).append(num)
+                    
+                    # Hiển thị từ mức cao xuống thấp
+                    sorted_levels = sorted(levels.keys(), reverse=True)
+                    
+                    for lvl in sorted_levels:
+                        nums = sorted(levels[lvl])
+                        # Tô đỏ số nếu trùng với kết quả mới nhất
+                        display_nums = []
+                        for n in nums:
+                            if n == latest_ref_val:
+                                display_nums.append(f"<span style='color:red; font-weight:bold; border:1px solid red; padding:2px'>{n}</span>")
+                            else:
+                                display_nums.append(n)
+                        
+                        st.markdown(f"**Mức {lvl}** ({len(nums)} số): {', '.join(display_nums)}", unsafe_allow_html=True)
+                    
+                    st.caption(f"*Số màu đỏ là số trùng với GĐB/G1 mới nhất ({latest_ref_val})*")
+                else:
+                    st.write("Không có dữ liệu để tính mức.")
 
 # === TAB 3: BỆT (BET) ===
 with tabs[2]:
@@ -276,4 +319,5 @@ with tabs[4]:
             st.success(f"Tìm thấy {len(found)} lần xuất hiện.")
             st.dataframe(pd.DataFrame(found), use_container_width=True)
         else:
+
             st.warning("Không tìm thấy trong phạm vi dữ liệu.")

@@ -41,7 +41,7 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
     
-    st.caption("Phiên bản Web v1.0")
+    st.caption("Phiên bản Web v1.1")
 
 # --- LOAD DATA ---
 try:
@@ -157,9 +157,8 @@ with tabs[1]:
             color = '#ffcccc' if val == "CHƯA NỔ" else '#ccffcc'
             return f'background-color: {color}'
 
-if not df_res.empty:
-            # 1. Cấu hình độ rộng cột
-            # "small" là kích thước bé nhất Streamlit hỗ trợ
+        if not df_res.empty:
+            # Cấu hình cột bé lại
             col_config = {
                 "Ngày": st.column_config.TextColumn("Ngày", width="medium"),
                 "KQ Nguồn": st.column_config.TextColumn("KQ", width="small"), 
@@ -168,14 +167,12 @@ if not df_res.empty:
             }
             
             # Tự động cấu hình cho tất cả cột K (K1 -> K21) thành "small"
-            # Và đổi tên hiển thị chỉ còn số (ví dụ "K1" -> "1") cho gọn
             for k_col in [c for c in df_res.columns if c.startswith("K")]:
                 col_config[k_col] = st.column_config.TextColumn(
                     k_col.replace("K", ""), # Đổi tên hiển thị: K1 -> 1
                     width="small"
                 )
 
-            # 2. Hiển thị bảng
             st.dataframe(
                 df_res.style.applymap(color_status, subset=['Trạng thái']),
                 column_config=col_config,
@@ -195,24 +192,19 @@ if not df_res.empty:
             with c_stat:
                 st.info("📊 THỐNG KÊ MỨC SỐ (TỪ CÁC DÀN CHƯA NỔ)")
                 
-                # Logic tính mức số
                 if raw_missed_data:
                     from collections import Counter
-                    # Gom tất cả số thành 1 chuỗi rồi tách ra
                     all_nums = " ".join(raw_missed_data).split()
                     counts = Counter(all_nums)
                     
-                    # Gom nhóm theo tần suất (Mức)
                     levels = {}
                     for num, freq in counts.items():
                         levels.setdefault(freq, []).append(num)
                     
-                    # Hiển thị từ mức cao xuống thấp
                     sorted_levels = sorted(levels.keys(), reverse=True)
                     
                     for lvl in sorted_levels:
                         nums = sorted(levels[lvl])
-                        # Tô đỏ số nếu trùng với kết quả mới nhất
                         display_nums = []
                         for n in nums:
                             if n == latest_ref_val:
@@ -342,7 +334,4 @@ with tabs[4]:
             st.success(f"Tìm thấy {len(found)} lần xuất hiện.")
             st.dataframe(pd.DataFrame(found), use_container_width=True)
         else:
-
             st.warning("Không tìm thấy trong phạm vi dữ liệu.")
-
-

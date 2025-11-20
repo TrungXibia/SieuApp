@@ -537,7 +537,7 @@ with tabs[5]:
             
             row = {"Ngày": date_str, "KQ": kq_short}
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
-            top_3 = sorted_freqs[:3]
+            top_3 = sorted_freqs[:2]
             disp_grps = []
             for f in top_3:
                 disp_grps.append(",".join(sorted(freq_groups[f])))
@@ -584,3 +584,4 @@ with tabs[5]:
             return styles
 
         st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=False)
+

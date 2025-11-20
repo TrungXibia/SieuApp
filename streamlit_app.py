@@ -398,136 +398,110 @@ with tabs[4]:
             st.warning("Không tìm thấy.")
 
 # ------------------------------------------------------------------------------
-# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY) - TOP 3 THEO THỨ TỰ MỨC
+# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY)
 # ------------------------------------------------------------------------------
 with tabs[5]:
     st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
     
     freq_rows = []
     
-    if len(dt_show) < 7:
-        st.warning("Cần ít nhất 7 ngày dữ liệu để tính tần suất.")
+    # Lấy 7 ngày mới nhất để phân tích
+    target_data = dt_show[:7] 
+    
+    if len(target_data) < 7:
+        st.warning("Cần ít nhất 7 ngày dữ liệu để tính toán.")
     else:
-        # Duyệt từ ngày mới nhất -> cũ
+        # --- PHẦN 1: BẢNG GOM NHÓM TẦN SUẤT & TOP 3 (GIỮ NGUYÊN) ---
         for i in range(len(dt_show) - 6):
             current_day = dt_show[i]
             date_str = shorten_date(current_day['date'])
             kq_str = "".join(current_day['numbers'])
             
-            # Lấy cửa sổ 7 ngày
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
             
-            # Đếm tần suất 0-9
             counts_map = {str(d): merged_str.count(str(d)) for d in range(10)}
             
-            # Group lại: {Tần suất: [Danh sách số]}
             freq_groups = {}
             for digit, count in counts_map.items():
                 freq_groups.setdefault(count, []).append(digit)
             
-            row = {
-                "Ngày": date_str,
-                "KQ/MỨC": kq_str
-            }
+            row = {"Ngày": date_str, "KQ/MỨC": kq_str}
             
-            # --- LOGIC MỚI: GIỮ NGUYÊN THỨ TỰ MỨC ---
-            # 1. Lấy danh sách các mức tần suất, sắp xếp từ Cao -> Thấp
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
-            
-            # 2. Lấy 3 mức đầu tiên
             top_3_freqs = sorted_freqs[:3]
-            
-            # 3. Tạo chuỗi hiển thị: Duyệt từng mức, gộp số trong mức đó lại
             display_groups = []
             for f in top_3_freqs:
                 digits = freq_groups[f]
-                # Sắp xếp nội bộ các số trong cùng 1 mức (VD: 7,6 -> 67)
                 digits_sorted = "".join(sorted(digits)) 
                 display_groups.append(digits_sorted)
             
-            # 4. Nối các nhóm lại bằng dấu cách (VD: "4" + " " + "67" + " " + "123")
             row["TOP 3"] = " ".join(display_groups)
             
-            # Điền các cột tần suất 0-15 (để hiển thị chi tiết bên cạnh)
             for f in range(16): 
                 digits = freq_groups.get(f, [])
                 row[str(f)] = ",".join(sorted(digits))
             
             freq_rows.append(row)
 
-        # --- HIỂN THỊ BẢNG ---
         df_freq = pd.DataFrame(freq_rows)
         
-        # Sắp xếp lại thứ tự cột
         cols_order = ["Ngày", "KQ/MỨC"] + [str(f) for f in range(16) if str(f) in df_freq.columns] + ["TOP 3"]
         df_freq = df_freq[cols_order]
 
-        # Cấu hình cột
         col_cfg = {
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
             "KQ/MỨC": st.column_config.TextColumn("KQ", width="medium"),
             "TOP 3": st.column_config.TextColumn("TOP 3 (Mức 1-2-3)", width="medium"),
         }
-        
         for f in range(16):
             if str(f) in df_freq.columns:
                 col_cfg[str(f)] = st.column_config.TextColumn(str(f), width="small")
 
-        # Hàm tô màu
         def highlight_cols(row):
             styles = []
             for col in row.index:
                 val = row[col]
-                
-                # Tô màu cột TOP 3 (Vàng đậm hơn chút để nổi bật)
                 if col == "TOP 3":
                     styles.append('background-color: #ffffcc; color: #d63031; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
-                
                 if col in ["Ngày", "KQ/MỨC"]:
                     styles.append("")
                     continue
-                
                 try:
                     freq = int(col)
-                    if not val:
-                        styles.append("")
-                        continue
-                    if freq == 0:
-                        styles.append('color: gray; font-style: italic;')
-                    elif freq >= 8:
-                        styles.append('color: #ff0000; font-weight: bold; background-color: #ffe6e6')
-                    elif freq >= 5:
-                        styles.append('color: #cc0000; font-weight: bold;')
-                    else:
-                        styles.append('color: black;')
-                except:
-                    styles.append("")
+                    if not val: styles.append("")
+                    elif freq == 0: styles.append('color: gray; font-style: italic;')
+                    elif freq >= 8: styles.append('color: #ff0000; font-weight: bold; background-color: #ffe6e6')
+                    elif freq >= 5: styles.append('color: #cc0000; font-weight: bold;')
+                    else: styles.append('color: black;')
+                except: styles.append("")
             return styles
 
-        st.markdown("##### 🔢 Bảng Tần Suất & Top 3 Mức Cao Nhất")
-        st.dataframe(
-            df_freq.style.apply(highlight_cols, axis=1),
-            column_config=col_cfg,
-            hide_index=True,
-            use_container_width=False,
-            height=600
-        )
-        
-        st.caption("**Giải thích cột TOP 3:** Các nhóm số được sắp xếp theo mức độ xuất hiện giảm dần, phân cách bằng dấu cách. (VD: '4 67 123' nghĩa là số 4 ra nhiều nhất, tiếp theo là nhóm 6,7 và cuối cùng là nhóm 1,2,3).")
+        st.markdown("##### 🔢 Bảng Tần Suất & Top 3 Mức Cao Nhất (Theo Dòng)")
+        st.dataframe(df_freq.style.apply(highlight_cols, axis=1), column_config=col_cfg, hide_index=True, use_container_width=False, height=400)
 
     st.divider()
 
-    # --- PHẦN 2: HEATMAP 00-99 ---
-    st.markdown("##### 🗺️ Bản đồ nhiệt cặp số 00-99")
-    all_nums_str = "".join(["".join(x['numbers']) for x in dt_show])
-    from collections import Counter
+    # --- PHẦN 2: HEATMAP 00-99 (LOGIC VBA: ĐẾM TRONG 7 NGÀY) ---
+    st.markdown("##### 🗺️ Tần suất cặp số 00-99 (Trong 7 ngày mới nhất)")
+    
+    # 1. Gộp chuỗi của 7 ngày mới nhất
+    # Logic VBA: InStr / Replace length -> Tương đương string.count() trong Python
+    target_data = dt_show[:7] # Lấy đúng 7 ngày đầu tiên
+    merged_7_days = "".join(["".join(day['numbers']) for day in target_data])
+    
+    # 2. Tính toán
     pair_counts = {}
+    max_val = 0
     for i in range(100):
         p = f"{i:02d}"
-        pair_counts[p] = all_nums_str.count(p)
+        # Đếm số lần xuất hiện của cặp số p trong chuỗi
+        c = merged_7_days.count(p) 
+        pair_counts[p] = c
+        if c > max_val: max_val = c
         
+    # 3. Tạo Grid 10x10
     grid = []
     for d in range(10):
         r = {"Đầu": str(d)}
@@ -535,8 +509,30 @@ with tabs[5]:
             r[str(u)] = pair_counts.get(f"{d}{u}", 0)
         grid.append(r)
     
+    df_grid = pd.DataFrame(grid).set_index("Đầu")
+
+    # 4. Hàm tô màu thủ công (Thay thế background_gradient để tránh lỗi Matplotlib)
+    def custom_heatmap(val):
+        if not isinstance(val, int): return ''
+        if val == 0: return 'color: #e0e0e0' # Xám nhạt nếu 0
+        
+        # Tính tỷ lệ để tô màu (Mô phỏng YlOrRd)
+        # Ít -> Vàng nhạt, Nhiều -> Đỏ đậm
+        if max_val == 0: return ''
+        ratio = val / max_val
+        
+        if ratio >= 0.8: bg = '#ff4b4b'; color = 'white' # Đỏ đậm
+        elif ratio >= 0.5: bg = '#ffbaba'; color = 'black' # Đỏ nhạt
+        elif ratio > 0: bg = '#ffffcc'; color = 'black' # Vàng
+        else: bg = 'white'; color = 'black'
+        
+        return f'background-color: {bg}; color: {color}; font-weight: bold'
+
+    # Hiển thị
     st.dataframe(
-        pd.DataFrame(grid).set_index("Đầu").style.background_gradient(cmap="YlOrRd", axis=None),
-        use_container_width=True
+        df_grid.style.applymap(custom_heatmap),
+        use_container_width=True,
+        height=450
     )
+    st.info(f"💡 Bảng đếm số lần xuất hiện của cặp số 00-99 trong chuỗi số của **7 ngày gần nhất** ({shorten_date(target_data[-1]['date'])} đến {shorten_date(target_data[0]['date'])}).")
 

@@ -8,11 +8,8 @@ BO_DICT = {
     "13": ["13","31","18","81","36","63","68","86"], "14": ["14","41","19","91","46","64","69","96"], "23": ["23","32","28","82","73","37","78","87"],
     "24": ["24","42","29","92","74","47","79","97"], "34": ["34","43","39","93","84","48","89","98"]
 }
-# Tạo reverse map để tra cứu nhanh hơn O(1)
-REVERSE_BO = {}
-for k, v_list in BO_DICT.items():
-    for v in v_list:
-        REVERSE_BO[v] = k
+# Tạo map ngược để tra nhanh
+REVERSE_BO = {v: k for k, vals in BO_DICT.items() for v in vals}
 
 KEP_DICT = {
     "K.AM": ["07","70","14","41","29","92","36","63","58","85"],
@@ -21,9 +18,9 @@ KEP_DICT = {
     "S.KEP": ["01","10","12","21","23","32","34","43","45","54","56","65","67","76","78","87","89","98","09","90"]
 }
 
-# --- LOGIC ---
+# --- HÀM TRA CỨU ---
 def bo(db: str) -> str:
-    return REVERSE_BO.get(db.zfill(2), "44")
+    return REVERSE_BO.get(db.zfill(2), "44") # Mặc định trả về 44 hoặc giá trị an toàn
 
 def kep(db: str) -> str:
     db = db.zfill(2)
@@ -31,11 +28,10 @@ def kep(db: str) -> str:
         if db in vals: return key
     return "-"
 
+# --- LOGIC NÂNG CAO ---
 def tim_chu_so_bet(d1, d2, kieu):
-    """Tìm chữ số bệt giữa 2 dãy số list/string"""
-    # Ép kiểu về list ký tự để an toàn
-    d1 = list(d1)
-    d2 = list(d2)
+    """Tìm chữ số bệt giữa 2 dãy số (list hoặc str)"""
+    d1, d2 = list(d1), list(d2) # Ép kiểu list để an toàn
     bet = []
     min_len = min(len(d1), len(d2))
     
@@ -51,20 +47,20 @@ def tim_chu_so_bet(d1, d2, kieu):
     return sorted(set(bet))
 
 def lay_dan_cham(chuoi_cham):
-    res = set()
+    res = []
     for i in range(100):
         pair = f"{i:02d}"
         for c in chuoi_cham:
             if c in pair:
-                res.add(pair)
+                res.append(pair)
                 break
-    return sorted(res)
+    return sorted(set(res))
 
 def lay_nhi_hop(bet_digits, digits_2_dong):
     unique_digits = sorted(set(digits_2_dong))
-    nh = set()
+    nh = []
     for a, b in combinations(unique_digits, 2):
         if a in bet_digits or b in bet_digits:
-            nh.add(a + b)
-            nh.add(b + a)
-    return sorted(nh)
+            nh.append(a + b)
+            nh.append(b + a)
+    return sorted(set(nh))

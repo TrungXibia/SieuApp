@@ -116,17 +116,38 @@ with tabs[0]:
 
 # === TAB 2: DÀN NUÔI (MATRIX VIEW) ===
 with tabs[1]:
-    c1, c2, c3 = st.columns([1, 1, 2])
+    c1, c2, c3, c4 = st.columns([1, 1, 1.5, 1.5])
     src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán"])
     comp_mode = c2.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
     check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
+    backtest_mode = c4.selectbox("Backtest:", [
+        "Hiện tại",
+        "Lùi 1 ngày",
+        "Lùi 2 ngày",
+        "Lùi 3 ngày",
+        "Lùi 4 ngày",
+        "Lùi 5 ngày"
+    ])
     
     if st.button("🚀 Phân Tích Bảng Chéo", type="primary"):
         res_list = []
         pending_combos_all = []  # Lưu tất cả dàn chưa nổ
         col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
         
-        for i in range(len(df_show)):
+        # Tính offset từ backtest mode
+        backtest_offset = 0
+        if backtest_mode != "Hiện tại":
+            backtest_offset = int(backtest_mode.split()[1])
+        
+        # Hiển thị thông báo backtest
+        if backtest_offset > 0:
+            st.info(f"🔍 Đang backtest: Phân tích dàn từ {backtest_offset} ngày trước và kiểm tra kết quả trong {backtest_offset} ngày tiếp theo (đã biết)")
+        
+        # Điều chỉnh range với offset
+        start_idx = backtest_offset
+        end_idx = len(df_show)
+        
+        for i in range(start_idx, end_idx):
             row = df_full.iloc[i]
             # Lấy nguồn số
             src_str = ""
@@ -145,7 +166,10 @@ with tabs[1]:
             first_hit = ""
             hit_combos = set()  # Các số đã trúng
             
-            for k in range(1, check_range + 1):
+            # Khi backtest, giới hạn check range trong khoảng đã biết
+            max_check = min(check_range, i - backtest_offset) if backtest_offset > 0 else check_range
+            
+            for k in range(1, max_check + 1):
                 idx = i - k
                 val_res = ""
                 cell_val = "" # Giá trị hiển thị trong ô
@@ -264,6 +288,69 @@ with tabs[1]:
                 hide_index=True, use_container_width=True
             )
             st.caption(f"*Chú thích: N1, N2... là ngày thứ 1, thứ 2 sau khi có cầu. Ô tích xanh là trúng.*")
+            
+            # === KẾT QUẢ BACKTEST ===
+            if backtest_offset > 0:
+                st.markdown("---")
+                st.subheader("📊 KẾT QUẢ BACKTEST")
+                st.caption(f"Kiểm tra độ chính xác của dự đoán từ {backtest_offset} ngày trước")
+                
+                # Tính toán metrics
+                total_dans_bt = len(df_res)
+                dans_hit_bt = len(df_res[df_res['KQ'].str.contains('Ăn', na=False)])
+                dans_pending_bt = total_dans_bt - dans_hit_bt
+                hit_rate_bt = round(dans_hit_bt / total_dans_bt * 100, 1) if total_dans_bt > 0 else 0
+                
+                # Hiển thị metrics
+                col_bt1, col_bt2, col_bt3, col_bt4 = st.columns(4)
+                col_bt1.metric("Ngày backtest", f"Lùi {backtest_offset} ngày")
+                col_bt2.metric("Tổng dàn test", total_dans_bt)
+                col_bt3.metric("Dàn đã trúng", dans_hit_bt, delta=f"{hit_rate_bt}%")
+                col_bt4.metric("Dàn chưa trúng", dans_pending_bt)
+                
+                # Biểu đồ kết quả
+                col_chart_bt1, col_chart_bt2 = st.columns(2)
+                
+                with col_chart_bt1:
+                    import plotly.graph_objects as go
+                    fig_bt = go.Figure(data=[
+                        go.Bar(name='Đã trúng', x=['Backtest'], y=[dans_hit_bt], marker_color='lightgreen', text=[dans_hit_bt], textposition='auto'),
+                        go.Bar(name='Chưa trúng', x=['Backtest'], y=[dans_pending_bt], marker_color='lightcoral', text=[dans_pending_bt], textposition='auto')
+                    ])
+                    fig_bt.update_layout(
+                        title="Kết quả Backtest",
+                        barmode='stack',
+                        height=300,
+                        showlegend=True
+                    )
+                    st.plotly_chart(fig_bt, use_container_width=True)
+                
+                with col_chart_bt2:
+                    # Pie chart tỷ lệ
+                    fig_pie = go.Figure(data=[
+                        go.Pie(
+                            labels=['Đã trúng', 'Chưa trúng'],
+                            values=[dans_hit_bt, dans_pending_bt],
+                            marker=dict(colors=['lightgreen', 'lightcoral']),
+                            textinfo='label+percent',
+                            hole=0.3
+                        )
+                    ])
+                    fig_pie.update_layout(
+                        title=f"Tỷ lệ trúng: {hit_rate_bt}%",
+                        height=300
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                
+                # Đánh giá
+                if hit_rate_bt >= 70:
+                    st.success(f"✅ Tuyệt vời! Tỷ lệ trúng {hit_rate_bt}% - Dự đoán rất chính xác!")
+                elif hit_rate_bt >= 50:
+                    st.info(f"ℹ️ Khá tốt! Tỷ lệ trúng {hit_rate_bt}% - Dự đoán ở mức trung bình khá")
+                elif hit_rate_bt >= 30:
+                    st.warning(f"⚠️ Tỷ lệ trúng {hit_rate_bt}% - Cần cải thiện chiến lược")
+                else:
+                    st.error(f"❌ Tỷ lệ trúng {hit_rate_bt}% - Nên xem xét lại phương pháp")
             
             # Hiển thị danh sách dàn chưa nổ
             if pending_combos_all:

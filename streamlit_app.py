@@ -211,6 +211,57 @@ with tabs[1]:
             col_s2.metric("Tổng kiểm tra", total_checks)
             col_s3.metric("Đã trúng", total_hits)
             col_s4.metric("Tỷ lệ", f"{hit_rate}%")
+            
+            # === TỔNG HỢP DÀN CHƯA RA ===
+            st.markdown("---")
+            st.subheader("🎯 Tổng hợp Dàn Chưa Ra")
+            st.caption("Các số chưa trúng trong tất cả các ngày, phân loại theo mức tần suất")
+            
+            all_pending_numbers = {}
+            for row_idx, day_data in enumerate(all_days_data):
+                combos = day_data['combos']
+                i = day_data['index']
+                num_cols_this_row = row_idx + 1
+                hit_numbers = set()
+                for k in range(1, num_cols_this_row + 1):
+                    idx = i - k
+                    if idx >= 0:
+                        val_res = df_full.iloc[idx][col_comp]
+                        if val_res in combos:
+                            hit_numbers.add(val_res)
+                pending = set(combos) - hit_numbers
+                for num in pending:
+                    all_pending_numbers[num] = all_pending_numbers.get(num, 0) + 1
+            
+            if all_pending_numbers:
+                from collections import defaultdict
+                level_groups = defaultdict(list)
+                for num, count in all_pending_numbers.items():
+                    level_groups[count].append(num)
+                
+                st.write("**Phân loại theo Mức (số lần xuất hiện trong các dàn):**")
+                for freq in sorted(level_groups.keys(), reverse=True):
+                    nums = sorted(level_groups[freq])
+                    count = len(nums)
+                    if freq >= 5:
+                        bg_color, text_color, icon, label = "#ffebee", "#c62828", "🔥", "HOT"
+                    elif freq >= 3:
+                        bg_color, text_color, icon, label = "#fff3e0", "#e65100", "⚡", "Quan tâm"
+                    else:
+                        bg_color, text_color, icon, label = "#f5f5f5", "#616161", "📌", "Theo dõi"
+                    
+                    level_html = f"""<div style="background-color: {bg_color}; padding: 12px; margin: 8px 0; border-radius: 5px; border-left: 4px solid {text_color};"><div style="color: {text_color}; font-weight: bold; margin-bottom: 5px; font-size: 14px;">{icon} Mức {freq} ({count} số) - {label}</div><div style="color: {text_color}; font-size: 16px; font-weight: 500;">{', '.join(nums)}</div></div>"""
+                    st.markdown(level_html, unsafe_allow_html=True)
+                
+                total_pending = len(all_pending_numbers)
+                hot_pending = len([n for n, c in all_pending_numbers.items() if c >= 5])
+                col_p1, col_p2, col_p3 = st.columns(3)
+                col_p1.metric("Tổng số chưa ra", total_pending)
+                col_p2.metric("Số HOT (≥5 lần)", hot_pending)
+                col_p3.metric("Tỷ lệ HOT", f"{round(hot_pending/total_pending*100, 1)}%" if total_pending > 0 else "0%")
+                st.caption("**Ghi chú:** 🔥 HOT (≥5 lần) → Ưu tiên nuôi | ⚡ Quan tâm (3-4 lần) | 📌 Theo dõi (1-2 lần)")
+            else:
+                st.success("✅ Tất cả các số đều đã trúng!")
 
 
 with tabs[2]:

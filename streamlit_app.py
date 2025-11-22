@@ -306,14 +306,17 @@ with tabs[1]:
                     mime="text/csv"
                 )
                 
-                # === PHẦN MỚI: NHỊ HỢP VÀ PHÂN TÍCH TẦN SUẤT ===
+                # === PHẦN MỚI: NHỊ HỢP THEO NGÀY ===
                 st.markdown("---")
-                st.subheader("🔢 Nhị Hợp từ Dàn Chưa Nổ")
-                st.caption("Tạo tất cả nhị hợp (bao gồm kép) từ các số trong dàn chưa nổ")
+                st.subheader("🔢 Nhị Hợp Chưa Nổ Theo Ngày")
+                st.caption("Danh sách nhị hợp chưa nổ của từng ngày (bao gồm kép)")
                 
-                # Tạo nhị hợp từ tất cả dàn chưa nổ
-                all_nhi_hop = set()
+                # Tạo nhị hợp cho từng ngày
+                nhi_hop_by_date = []
+                all_nhi_hop_freq = {}  # Để đếm tần suất tổng
+                
                 for item in pending_combos_all:
+                    date = item['Ngày']
                     dan_str = item['Dàn']
                     numbers = [n.strip() for n in dan_str.split(',')]
                     
@@ -324,92 +327,155 @@ with tabs[1]:
                             digits.add(digit)
                     
                     # Tạo nhị hợp (bao gồm kép)
-                    for d1 in digits:
-                        for d2 in digits:
-                            all_nhi_hop.add(d1 + d2)
+                    nhi_hop_set = set()
+                    for d1 in sorted(digits):
+                        for d2 in sorted(digits):
+                            nhi_hop_set.add(d1 + d2)
+                    
+                    nhi_hop_list = sorted(nhi_hop_set)
+                    
+                    # Đếm tần suất trong lịch sử cho từng số
+                    nhi_hop_with_freq = []
+                    for num in nhi_hop_list:
+                        count = 0
+                        for val in df_full[col_comp].dropna():
+                            if str(val).zfill(2)[-2:] == num:
+                                count += 1
+                        nhi_hop_with_freq.append((num, count))
+                        
+                        # Cập nhật tần suất tổng
+                        if num not in all_nhi_hop_freq:
+                            all_nhi_hop_freq[num] = count
+                    
+                    nhi_hop_by_date.append({
+                        'date': date,
+                        'source': item['Nguồn'],
+                        'nhi_hop': nhi_hop_with_freq,
+                        'total': len(nhi_hop_list)
+                    })
                 
-                nhi_hop_list = sorted(all_nhi_hop)
+                # Hiển thị theo từng ngày với badge màu
+                for idx, item in enumerate(nhi_hop_by_date):
+                    # Tạo badge ngày với màu
+                    day_num = item['date'].split('-')[0] if '-' in item['date'] else item['date'][:2]
+                    
+                    # HTML cho badge ngày
+                    badge_html = f"""
+                    <div style="display: flex; align-items: center; margin: 10px 0;">
+                        <div style="background-color: #c9a0dc; color: white; padding: 5px 10px; 
+                                    border-radius: 5px; font-weight: bold; margin-right: 10px; min-width: 40px; text-align: center;">
+                            {day_num}
+                        </div>
+                        <div style="color: #888; font-size: 14px;">
+                            {item['date']} ({item['source']}): 
+                        </div>
+                    </div>
+                    """
+                    st.markdown(badge_html, unsafe_allow_html=True)
+                    
+                    # Hiển thị nhị hợp với màu theo tần suất
+                    nhi_hop_html = '<div style="display: flex; flex-wrap: wrap; gap: 5px; margin-left: 50px; margin-bottom: 15px;">'
+                    
+                    for num, freq in item['nhi_hop']:
+                        # Chọn màu dựa trên tần suất
+                        if freq >= 10:
+                            bg_color = "#90EE90"  # Xanh lá nhạt
+                            text_color = "#006400"  # Xanh đậm
+                        elif freq >= 5:
+                            bg_color = "#FFD700"  # Vàng
+                            text_color = "#8B4513"  # Nâu
+                        elif freq >= 2:
+                            bg_color = "#FFB6C1"  # Hồng nhạt
+                            text_color = "#8B0000"  # Đỏ đậm
+                        else:
+                            bg_color = "#E0E0E0"  # Xám nhạt
+                            text_color = "#404040"  # Xám đậm
+                        
+                        nhi_hop_html += f'''
+                        <span style="background-color: {bg_color}; color: {text_color}; 
+                                     padding: 3px 8px; border-radius: 3px; font-weight: 500;
+                                     font-size: 14px; display: inline-block;">
+                            {num}
+                        </span>
+                        '''
+                    
+                    nhi_hop_html += '</div>'
+                    st.markdown(nhi_hop_html, unsafe_allow_html=True)
                 
-                # Hiển thị danh sách nhị hợp
-                st.write(f"**Tổng số nhị hợp:** {len(nhi_hop_list)} số")
-                
-                # Hiển thị dạng lưới
-                cols_per_row = 10
-                nhi_hop_display = ""
-                for i, num in enumerate(nhi_hop_list):
-                    nhi_hop_display += f"`{num}` "
-                    if (i + 1) % cols_per_row == 0:
-                        nhi_hop_display += "\n\n"
-                st.markdown(nhi_hop_display)
-                
-                # Phân tích tần suất xuất hiện trong lịch sử
+                # === THỐNG KÊ MỨC SỐ ===
                 st.markdown("---")
-                st.subheader("📊 Phân Tích Tần Suất Xuất Hiện")
-                st.caption("Đếm số lần xuất hiện của các số nhị hợp trong lịch sử")
+                st.markdown("### 📊 THỐNG KÊ MỨC SỐ")
+                st.caption("Gom các số theo tần suất xuất hiện (Trùng với ĐB/G1 mới nhất)")
                 
-                # Đếm tần suất
-                freq_dict = {}
-                for num in nhi_hop_list:
-                    count = 0
-                    # Đếm trong cột được chọn
-                    for val in df_full[col_comp].dropna():
-                        if str(val).zfill(2)[-2:] == num:
-                            count += 1
-                    freq_dict[num] = count
-                
-                # Tạo DataFrame
+                # Tạo DataFrame tần suất
                 df_freq = pd.DataFrame([
                     {"Số": k, "Tần suất": v}
-                    for k, v in freq_dict.items()
+                    for k, v in all_nhi_hop_freq.items()
                 ])
                 df_freq = df_freq.sort_values('Tần suất', ascending=False)
                 
                 # Gom theo mức (cùng tần suất)
-                st.write("**Phân loại theo Mức Tần suất:**")
-                
                 from collections import defaultdict
                 level_groups = defaultdict(list)
                 for _, row in df_freq.iterrows():
                     freq = row['Tần suất']
                     level_groups[freq].append(row['Số'])
                 
-                # Tạo bảng mức
-                level_data = []
+                # Hiển thị theo mức với màu sắc
                 for freq in sorted(level_groups.keys(), reverse=True):
-                    nums = level_groups[freq]
-                    level_data.append({
-                        "Mức (Tần suất)": freq,
-                        "Số lượng": len(nums),
-                        "Các số": ", ".join(sorted(nums))
-                    })
-                
-                df_levels = pd.DataFrame(level_data)
-                
-                # Highlight theo mức
-                def highlight_freq_level(row):
-                    freq = row['Mức (Tần suất)']
+                    nums = sorted(level_groups[freq])
+                    count = len(nums)
+                    
+                    # Chọn màu
                     if freq >= 10:
-                        return ['background-color: #d4edda'] * len(row)  # Xanh - Hot
+                        bg_color = "#d4edda"
+                        text_color = "#155724"
+                        icon = "🟢"
                     elif freq >= 5:
-                        return ['background-color: #fff3cd'] * len(row)  # Vàng - Trung bình
+                        bg_color = "#fff3cd"
+                        text_color = "#856404"
+                        icon = "🟡"
                     elif freq >= 2:
-                        return ['background-color: #f8d7da'] * len(row)  # Đỏ nhạt - Ít
+                        bg_color = "#f8d7da"
+                        text_color = "#721c24"
+                        icon = "🔴"
                     else:
-                        return ['background-color: #e2e3e5'] * len(row)  # Xám - Rất ít
+                        bg_color = "#e2e3e5"
+                        text_color = "#383d41"
+                        icon = "⚪"
+                    
+                    # HTML cho mỗi mức
+                    level_html = f"""
+                    <div style="background-color: {bg_color}; padding: 10px; margin: 8px 0; 
+                                border-radius: 5px; border-left: 4px solid {text_color};">
+                        <div style="color: {text_color}; font-weight: bold; margin-bottom: 5px;">
+                            {icon} Mức {freq} ({count} số):
+                        </div>
+                        <div style="color: {text_color}; font-size: 16px; font-weight: 500;">
+                            {', '.join(nums)}
+                        </div>
+                    </div>
+                    """
+                    st.markdown(level_html, unsafe_allow_html=True)
                 
-                st.dataframe(
-                    df_levels.style.apply(highlight_freq_level, axis=1),
-                    hide_index=True,
-                    use_container_width=True
-                )
+                # Chú thích
+                st.caption("""
+                **Chú thích:**
+                - 🟢 Mức ≥10: Số HOT (xuất hiện nhiều)
+                - 🟡 Mức 5-9: Trung bình
+                - 🔴 Mức 2-4: Ít xuất hiện
+                - ⚪ Mức 0-1: Số GAN (rất ít hoặc chưa từng về)
+                """)
                 
-                st.caption("""**Chú thích màu sắc:**
-                - 🟢 Xanh: Tần suất ≥10 (Hot)
-                - 🟡 Vàng: Tần suất 5-9 (Trung bình)
-                - 🔴 Đỏ nhạt: Tần suất 2-4 (Ít)
-                - ⚪ Xám: Tần suất 0-1 (Rất ít)""")
+                # Thống kê tổng
+                st.markdown("---")
+                col_stat1, col_stat2, col_stat3 = st.columns(3)
+                col_stat1.metric("Tổng số nhị hợp", len(all_nhi_hop_freq))
+                col_stat2.metric("Số HOT (≥10)", len([f for f in all_nhi_hop_freq.values() if f >= 10]))
+                col_stat3.metric("Số GAN (0-1)", len([f for f in all_nhi_hop_freq.values() if f <= 1]))
                 
-                # Biểu đồ phân bố tần suất
+                # Biểu đồ phân bố
+                st.markdown("---")
                 col_chart1, col_chart2 = st.columns(2)
                 
                 with col_chart1:
@@ -430,21 +496,24 @@ with tabs[1]:
                 
                 with col_chart2:
                     # Phân bố theo mức tần suất
-                    level_counts = df_levels[['Mức (Tần suất)', 'Số lượng']]
+                    level_data = pd.DataFrame([
+                        {"Mức": f"Mức {freq}", "Số lượng": len(nums)}
+                        for freq, nums in sorted(level_groups.items(), reverse=True)
+                    ])
                     fig2 = go.Figure(data=[
-                        go.Bar(x=level_counts['Mức (Tần suất)'].astype(str),
-                               y=level_counts['Số lượng'],
+                        go.Bar(x=level_data['Mức'],
+                               y=level_data['Số lượng'],
                                marker_color='lightcoral',
-                               text=level_counts['Số lượng'],
+                               text=level_data['Số lượng'],
                                textposition='auto')
                     ])
                     fig2.update_layout(title="Phân Bố Theo Mức Tần Suất",
-                                      xaxis_title="Mức (Tần suất)",
+                                      xaxis_title="Mức",
                                       yaxis_title="Số lượng số",
                                       height=350)
                     st.plotly_chart(fig2, use_container_width=True)
                 
-                # Export nhị hợp và tần suất
+                # Export
                 csv_nhi_hop = df_freq.to_csv(index=False, encoding='utf-8-sig')
                 st.download_button(
                     label="📥 Tải xuống Nhị Hợp & Tần Suất (CSV)",

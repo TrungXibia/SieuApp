@@ -1,6 +1,6 @@
 import requests
-from bs4 import BeautifulSoup
 import concurrent.futures
+from bs4 import BeautifulSoup
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -11,7 +11,8 @@ def fetch_url(url):
         r = requests.get(url, headers=HEADERS, timeout=10)
         r.raise_for_status()
         return BeautifulSoup(r.text, "html.parser")
-    except Exception:
+    except Exception as e:
+        logging.error(f"Lỗi tải {url}: {e}")
         return None
 
 def fetch_dien_toan(total_days):
@@ -48,6 +49,7 @@ def fetch_than_tai(total_days):
     return data
 
 def _parse_congcuxoso(url, total_days):
+    """Hàm phụ trợ parse dữ liệu từ congcuxoso"""
     soup = fetch_url(url)
     nums = []
     if soup:
@@ -63,7 +65,7 @@ def _parse_congcuxoso(url, total_days):
     return nums[:total_days]
 
 def fetch_xsmb_group(total_days):
-    """Hàm tải song song XSMB và G1"""
+    """Tải song song GĐB và G1 để tối ưu tốc độ"""
     with concurrent.futures.ThreadPoolExecutor() as executor:
         f1 = executor.submit(_parse_congcuxoso, "https://congcuxoso.com/MienBac/DacBiet/PhoiCauDacBiet/PhoiCauTuan5So.aspx", total_days)
         f2 = executor.submit(_parse_congcuxoso, "https://congcuxoso.com/MienBac/GiaiNhat/PhoiCauGiaiNhat/PhoiCauTuan5So.aspx", total_days)

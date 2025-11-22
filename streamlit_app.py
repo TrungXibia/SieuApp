@@ -174,7 +174,7 @@ with tabs[1]:
                 table_html += f"<td style='padding: 6px; border: 1px solid #ddd; font-size: 11px;'>{dan_str}</td>"
                 table_html += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>{len(combos)}</td>"
                 
-                num_cols_this_row = num_days - row_idx
+                num_cols_this_row = row_idx + 1
                 for k in range(1, num_cols_this_row + 1):
                     idx = i - k
                     cell_val, bg_color, text_color = "", "white", "black"
@@ -186,7 +186,7 @@ with tabs[1]:
                             cell_val, bg_color, text_color = "--", "#fff3cd", "#856404"
                     table_html += f"<td style='padding: 8px; border: 1px solid #ddd; background-color: {bg_color}; color: {text_color}; font-weight: bold; text-align: center;'>{cell_val}</td>"
                 
-                for _ in range(row_idx):
+                for _ in range(num_days - row_idx - 1):
                     table_html += "<td style='border: 1px solid #eee; background-color: #f9f9f9;'></td>"
                 table_html += "</tr>"
             
@@ -198,7 +198,7 @@ with tabs[1]:
             total_days, total_checks, total_hits = len(all_days_data), 0, 0
             for row_idx, day_data in enumerate(all_days_data):
                 combos, i = day_data['combos'], day_data['index']
-                for k in range(1, num_days - row_idx + 1):
+                for k in range(1, row_idx + 2):
                     idx = i - k
                     if idx >= 0:
                         total_checks += 1

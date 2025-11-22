@@ -156,38 +156,39 @@ with tabs[1]:
         else:
             st.markdown("### 📋 Bảng Theo Dõi")
             table_html = "<table style='border-collapse: collapse; width: 100%; font-size: 13px;'><tr>"
-            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 80px;'>Ngày</th>"
-            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 60px;'>Giải</th>"
-            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center;'>Dàn nhị hợp</th>"
-            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 50px;'>Mức</th>"
+            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 80px;'>Ngày</th>"
+            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 60px;'>Giải</th>"
+            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center;'>Dàn nhị hợp</th>"
+            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 50px;'>Mức</th>"
             
             num_days = len(all_days_data)
             for k in range(1, num_days + 1):
-                table_html += f"<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 45px;'>N{k}</th>"
+                table_html += f"<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 45px;'>N{k}</th>"
             table_html += "</tr>"
             
             for row_idx, day_data in enumerate(all_days_data):
                 date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
                 dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
-                table_html += f"<tr><td style='padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;'>{date}</td>"
-                table_html += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>{source}</td>"
-                table_html += f"<td style='padding: 6px; border: 1px solid #ddd; font-size: 11px;'>{dan_str}</td>"
-                table_html += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>{len(combos)}</td>"
+                row_bg = "#f8f9fa" if row_idx % 2 == 0 else "#ffffff"
+                table_html += f"<tr style='background-color: {row_bg};'><td style='padding: 8px; border: 1px solid #dee2e6; text-align: center; font-weight: bold; color: #2c3e50;'>{date}</td>"
+                table_html += f"<td style='padding: 8px; border: 1px solid #dee2e6; text-align: center; color: #495057;'>{source}</td>"
+                table_html += f"<td style='padding: 6px; border: 1px solid #dee2e6; font-size: 11px; color: #495057;'>{dan_str}</td>"
+                table_html += f"<td style='padding: 8px; border: 1px solid #dee2e6; text-align: center; font-weight: 600; color: #2c3e50;'>{len(combos)}</td>"
                 
                 num_cols_this_row = row_idx + 1
                 for k in range(1, num_cols_this_row + 1):
                     idx = i - k
-                    cell_val, bg_color, text_color = "", "white", "black"
+                    cell_val, bg_color, text_color = "", "#ecf0f1", "#7f8c8d"
                     if idx >= 0:
                         val_res = df_full.iloc[idx][col_comp]
                         if val_res in combos:
-                            cell_val, bg_color, text_color = "✅", "#d4edda", "green"
+                            cell_val, bg_color, text_color = "✅", "#27ae60", "white"
                         else:
-                            cell_val, bg_color, text_color = "--", "#fff3cd", "#856404"
-                    table_html += f"<td style='padding: 8px; border: 1px solid #ddd; background-color: {bg_color}; color: {text_color}; font-weight: bold; text-align: center;'>{cell_val}</td>"
+                            cell_val, bg_color, text_color = "--", "#e74c3c", "white"
+                    table_html += f"<td style='padding: 8px; border: 1px solid #dee2e6; background-color: {bg_color}; color: {text_color}; font-weight: bold; text-align: center;'>{cell_val}</td>"
                 
                 for _ in range(num_days - row_idx - 1):
-                    table_html += "<td style='border: 1px solid #eee; background-color: #f9f9f9;'></td>"
+                    table_html += "<td style='border: 1px solid #dee2e6; background-color: #ecf0f1;'></td>"
                 table_html += "</tr>"
             
             table_html += "</table>"

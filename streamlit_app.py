@@ -123,6 +123,7 @@ with tabs[1]:
     
     if st.button("🚀 Phân Tích Bảng Chéo", type="primary"):
         res_list = []
+        pending_combos_all = []  # Lưu tất cả dàn chưa nổ
         col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
         
         for i in range(len(df_show)):
@@ -142,6 +143,7 @@ with tabs[1]:
             k_cols = {}
             hits = 0
             first_hit = ""
+            hit_combos = set()  # Các số đã trúng
             
             for k in range(1, check_range + 1):
                 idx = i - k
@@ -152,29 +154,83 @@ with tabs[1]:
                     val_res = df_full.iloc[idx][col_comp]
                     if val_res in combos:
                         hits += 1
+                        hit_combos.add(val_res)
                         cell_val = f"✅ {val_res}"
                         if not first_hit: first_hit = f"N{k}"
                 
                 k_cols[f"{k}"] = cell_val # Cột 1, 2, 3...
             
+            # Tính dàn chưa nổ
+            pending = sorted(combos - hit_combos)
+            pending_count = len(pending)
+            
+            # Phân loại mức số
+            total = len(combos)
+            if total <= 10:
+                level = "Mức 10"
+            elif total <= 16:
+                level = "Mức 16"
+            elif total <= 25:
+                level = "Mức 25"
+            elif total <= 36:
+                level = "Mức 36"
+            else:
+                level = f"Mức {total}"
+            
             r = {
                 "Ngày": row['date'],
                 "Nguồn": src_str,
-                "SL": len(combos),
-                "KQ": f"Ăn {first_hit}" if hits else "⏳"
+                "Mức": level,
+                "Tổng": total,
+                "Đã nổ": hits,
+                "Chưa nổ": pending_count,
+                "KQ": f"Ăn {first_hit}" if hits else "⏳",
+                "Dàn chưa nổ": ", ".join(pending) if pending else "Đã hết"
             }
             r.update(k_cols)
             res_list.append(r)
             
+            # Lưu dàn chưa nổ để hiển thị riêng
+            if pending and hits == 0:  # Chỉ lấy dàn hoàn toàn chưa nổ
+                pending_combos_all.append({
+                    "Ngày": row['date'],
+                    "Nguồn": src_str,
+                    "Mức": level,
+                    "Số lượng": pending_count,
+                    "Dàn": ", ".join(pending)
+                })
+            
         if res_list:
             df_res = pd.DataFrame(res_list)
+            
+            # Hiển thị thống kê tổng quan
+            st.subheader("📊 Tổng quan")
+            col_a, col_b, col_c, col_d = st.columns(4)
+            total_dans = len(df_res)
+            dans_hit = len(df_res[df_res['KQ'].str.contains('Ăn', na=False)])
+            dans_pending = total_dans - dans_hit
+            hit_rate = round(dans_hit / total_dans * 100, 1) if total_dans > 0 else 0
+            
+            col_a.metric("Tổng dàn", total_dans)
+            col_b.metric("Đã nổ", dans_hit)
+            col_c.metric("Chưa nổ", dans_pending)
+            col_d.metric("Tỷ lệ nổ", f"{hit_rate}%")
+            
+            st.markdown("---")
+            
+            # Bảng chính
+            st.subheader("📋 Bảng phân tích chi tiết")
             
             # Config cột động
             col_cfg = {
                 "Ngày": st.column_config.TextColumn("Ngày", width="small"),
                 "Nguồn": st.column_config.TextColumn("Nguồn", width="small"),
-                "SL": st.column_config.TextColumn("Dàn", width="small"),
+                "Mức": st.column_config.TextColumn("Mức", width="small"),
+                "Tổng": st.column_config.NumberColumn("Tổng", width="small"),
+                "Đã nổ": st.column_config.NumberColumn("Đã nổ", width="small"),
+                "Chưa nổ": st.column_config.NumberColumn("Chưa nổ", width="small"),
                 "KQ": st.column_config.TextColumn("Trạng thái", width="small"),
+                "Dàn chưa nổ": st.column_config.TextColumn("Dàn chưa nổ", width="large"),
             }
             # Các cột ngày K thu nhỏ lại
             cols_k = [str(k) for k in range(1, check_range + 1)]
@@ -189,14 +245,217 @@ with tabs[1]:
             
             def highlight_status(val):
                 return 'background-color: #c3e6cb; color: darkgreen' if "Ăn" in str(val) else 'background-color: #f8d7da; color: maroon'
+            
+            def highlight_pending(val):
+                if isinstance(val, (int, float)):
+                    if val == 0:
+                        return 'background-color: #d4edda; color: green; font-weight: bold'
+                    elif val > 20:
+                        return 'background-color: #f8d7da; color: maroon'
+                    elif val > 10:
+                        return 'background-color: #fff3cd; color: orange'
+                return ''
 
             st.dataframe(
                 df_res.style.map(highlight_cells, subset=cols_k)
-                            .map(highlight_status, subset=['KQ']),
+                            .map(highlight_status, subset=['KQ'])
+                            .map(highlight_pending, subset=['Chưa nổ']),
                 column_config=col_cfg,
                 hide_index=True, use_container_width=True
             )
             st.caption(f"*Chú thích: N1, N2... là ngày thứ 1, thứ 2 sau khi có cầu. Ô tích xanh là trúng.*")
+            
+            # Hiển thị danh sách dàn chưa nổ
+            if pending_combos_all:
+                st.markdown("---")
+                st.subheader("🎯 Danh sách Dàn Chưa Nổ (100%)")
+                st.caption("Các dàn hoàn toàn chưa trúng trong khung nuôi")
+                
+                df_pending = pd.DataFrame(pending_combos_all)
+                
+                # Phân loại theo mức
+                st.write("**Phân loại theo mức số:**")
+                level_groups = df_pending.groupby('Mức').size().reset_index(name='Số lượng dàn')
+                
+                col_x, col_y = st.columns([1, 2])
+                with col_x:
+                    st.dataframe(level_groups, hide_index=True, use_container_width=True)
+                
+                with col_y:
+                    import plotly.graph_objects as go
+                    fig = go.Figure(data=[
+                        go.Bar(x=level_groups['Mức'], y=level_groups['Số lượng dàn'],
+                               marker_color='lightcoral', text=level_groups['Số lượng dàn'],
+                               textposition='auto')
+                    ])
+                    fig.update_layout(title="Phân bố Dàn chưa nổ theo Mức", 
+                                     xaxis_title="Mức", yaxis_title="Số lượng",
+                                     height=300)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Bảng chi tiết
+                st.write("**Chi tiết các dàn:**")
+                st.dataframe(df_pending, hide_index=True, use_container_width=True)
+                
+                # Export option
+                csv = df_pending.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 Tải xuống danh sách (CSV)",
+                    data=csv,
+                    file_name=f"dan_chua_no_{src_mode}_{comp_mode}.csv",
+                    mime="text/csv"
+                )
+                
+                # === PHẦN MỚI: NHỊ HỢP VÀ PHÂN TÍCH TẦN SUẤT ===
+                st.markdown("---")
+                st.subheader("🔢 Nhị Hợp từ Dàn Chưa Nổ")
+                st.caption("Tạo tất cả nhị hợp (bao gồm kép) từ các số trong dàn chưa nổ")
+                
+                # Tạo nhị hợp từ tất cả dàn chưa nổ
+                all_nhi_hop = set()
+                for item in pending_combos_all:
+                    dan_str = item['Dàn']
+                    numbers = [n.strip() for n in dan_str.split(',')]
+                    
+                    # Lấy tất cả chữ số unique
+                    digits = set()
+                    for num in numbers:
+                        for digit in num:
+                            digits.add(digit)
+                    
+                    # Tạo nhị hợp (bao gồm kép)
+                    for d1 in digits:
+                        for d2 in digits:
+                            all_nhi_hop.add(d1 + d2)
+                
+                nhi_hop_list = sorted(all_nhi_hop)
+                
+                # Hiển thị danh sách nhị hợp
+                st.write(f"**Tổng số nhị hợp:** {len(nhi_hop_list)} số")
+                
+                # Hiển thị dạng lưới
+                cols_per_row = 10
+                nhi_hop_display = ""
+                for i, num in enumerate(nhi_hop_list):
+                    nhi_hop_display += f"`{num}` "
+                    if (i + 1) % cols_per_row == 0:
+                        nhi_hop_display += "\n\n"
+                st.markdown(nhi_hop_display)
+                
+                # Phân tích tần suất xuất hiện trong lịch sử
+                st.markdown("---")
+                st.subheader("📊 Phân Tích Tần Suất Xuất Hiện")
+                st.caption("Đếm số lần xuất hiện của các số nhị hợp trong lịch sử")
+                
+                # Đếm tần suất
+                freq_dict = {}
+                for num in nhi_hop_list:
+                    count = 0
+                    # Đếm trong cột được chọn
+                    for val in df_full[col_comp].dropna():
+                        if str(val).zfill(2)[-2:] == num:
+                            count += 1
+                    freq_dict[num] = count
+                
+                # Tạo DataFrame
+                df_freq = pd.DataFrame([
+                    {"Số": k, "Tần suất": v}
+                    for k, v in freq_dict.items()
+                ])
+                df_freq = df_freq.sort_values('Tần suất', ascending=False)
+                
+                # Gom theo mức (cùng tần suất)
+                st.write("**Phân loại theo Mức Tần suất:**")
+                
+                from collections import defaultdict
+                level_groups = defaultdict(list)
+                for _, row in df_freq.iterrows():
+                    freq = row['Tần suất']
+                    level_groups[freq].append(row['Số'])
+                
+                # Tạo bảng mức
+                level_data = []
+                for freq in sorted(level_groups.keys(), reverse=True):
+                    nums = level_groups[freq]
+                    level_data.append({
+                        "Mức (Tần suất)": freq,
+                        "Số lượng": len(nums),
+                        "Các số": ", ".join(sorted(nums))
+                    })
+                
+                df_levels = pd.DataFrame(level_data)
+                
+                # Highlight theo mức
+                def highlight_freq_level(row):
+                    freq = row['Mức (Tần suất)']
+                    if freq >= 10:
+                        return ['background-color: #d4edda'] * len(row)  # Xanh - Hot
+                    elif freq >= 5:
+                        return ['background-color: #fff3cd'] * len(row)  # Vàng - Trung bình
+                    elif freq >= 2:
+                        return ['background-color: #f8d7da'] * len(row)  # Đỏ nhạt - Ít
+                    else:
+                        return ['background-color: #e2e3e5'] * len(row)  # Xám - Rất ít
+                
+                st.dataframe(
+                    df_levels.style.apply(highlight_freq_level, axis=1),
+                    hide_index=True,
+                    use_container_width=True
+                )
+                
+                st.caption("""**Chú thích màu sắc:**
+                - 🟢 Xanh: Tần suất ≥10 (Hot)
+                - 🟡 Vàng: Tần suất 5-9 (Trung bình)
+                - 🔴 Đỏ nhạt: Tần suất 2-4 (Ít)
+                - ⚪ Xám: Tần suất 0-1 (Rất ít)""")
+                
+                # Biểu đồ phân bố tần suất
+                col_chart1, col_chart2 = st.columns(2)
+                
+                with col_chart1:
+                    import plotly.graph_objects as go
+                    # Top 20 số có tần suất cao nhất
+                    top_20 = df_freq.head(20)
+                    fig1 = go.Figure(data=[
+                        go.Bar(x=top_20['Số'], y=top_20['Tần suất'],
+                               marker_color='lightblue',
+                               text=top_20['Tần suất'],
+                               textposition='auto')
+                    ])
+                    fig1.update_layout(title="Top 20 Số Hot Nhất",
+                                      xaxis_title="Số",
+                                      yaxis_title="Tần suất",
+                                      height=350)
+                    st.plotly_chart(fig1, use_container_width=True)
+                
+                with col_chart2:
+                    # Phân bố theo mức tần suất
+                    level_counts = df_levels[['Mức (Tần suất)', 'Số lượng']]
+                    fig2 = go.Figure(data=[
+                        go.Bar(x=level_counts['Mức (Tần suất)'].astype(str),
+                               y=level_counts['Số lượng'],
+                               marker_color='lightcoral',
+                               text=level_counts['Số lượng'],
+                               textposition='auto')
+                    ])
+                    fig2.update_layout(title="Phân Bố Theo Mức Tần Suất",
+                                      xaxis_title="Mức (Tần suất)",
+                                      yaxis_title="Số lượng số",
+                                      height=350)
+                    st.plotly_chart(fig2, use_container_width=True)
+                
+                # Export nhị hợp và tần suất
+                csv_nhi_hop = df_freq.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 Tải xuống Nhị Hợp & Tần Suất (CSV)",
+                    data=csv_nhi_hop,
+                    file_name=f"nhi_hop_tan_suat_{src_mode}_{comp_mode}.csv",
+                    mime="text/csv"
+                )
+                
+            else:
+                st.info("✅ Tất cả các dàn đều đã nổ ít nhất 1 lần!")
+
 
 # === TAB 3: BỆT CẦU ===
 with tabs[2]:

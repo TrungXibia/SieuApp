@@ -120,36 +120,24 @@ with tabs[1]:
     src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán"])
     comp_mode = c2.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
     check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
-    backtest_mode = c4.selectbox("Backtest:", [
-        "Hiện tại",
-        "Lùi 1 ngày",
-        "Lùi 2 ngày",
-        "Lùi 3 ngày",
-        "Lùi 4 ngày",
-        "Lùi 5 ngày"
-    ])
+    backtest_mode = c4.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
     
     if st.button("🚀 Phân Tích", type="primary"):
-        # Tính offset từ backtest mode
         backtest_offset = 0
         if backtest_mode != "Hiện tại":
             backtest_offset = int(backtest_mode.split()[1])
         
-        # Hiển thị thông báo backtest
         if backtest_offset > 0:
-            st.info(f"🔍 Đang backtest: Phân tích dàn từ {backtest_offset} ngày trước")
+            st.info(f"🔍 Backtest: Từ {backtest_offset} ngày trước")
         
         col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
         
-        # Giới hạn hiển thị 10 ngày gần nhất
+        all_days_data = []
         start_idx = backtest_offset
-        end_idx = min(backtest_offset + 10, len(df_show))
+        end_idx = min(backtest_offset + 20, len(df_show))
         
-        # Loop qua từng ngày
         for i in range(start_idx, end_idx):
             row = df_full.iloc[i]
-            
-            # Lấy nguồn số
             src_str = ""
             if src_mode == "Thần Tài": 
                 src_str = str(row.get('tt_number', ''))
@@ -159,99 +147,71 @@ with tabs[1]:
             if not src_str or src_str == "nan": 
                 continue
             
-            # Tạo dàn nhị hợp
             digits = set(src_str)
             combos = sorted({a+b for a in digits for b in digits})
+            all_days_data.append({'date': row['date'], 'source': src_str, 'combos': combos, 'index': i})
+        
+        if not all_days_data:
+            st.warning("⚠️ Không có dữ liệu")
+        else:
+            st.markdown("### 📋 Bảng Theo Dõi")
+            table_html = "<table style='border-collapse: collapse; width: 100%; font-size: 13px;'><tr>"
+            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 80px;'>Ngày</th>"
+            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 60px;'>Giải</th>"
+            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center;'>Dàn nhị hợp</th>"
+            table_html += "<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 50px;'>Mức</th>"
             
-            # === HEADER THÔNG TIN ===
-            st.markdown("---")
-            col_info1, col_info2 = st.columns([1, 2])
+            num_days = len(all_days_data)
+            for k in range(1, num_days + 1):
+                table_html += f"<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; text-align: center; min-width: 45px;'>N{k}</th>"
+            table_html += "</tr>"
             
-            with col_info1:
-                st.markdown(f"### 📅 {row['date']}")
-                st.write(f"**🎯 Giải:** {src_str} ({src_mode})")
-                st.write(f"**📊 Mức số:** Mức {len(combos)} ({len(combos)} số)")
-            
-            with col_info2:
-                st.write("**🔢 Dàn nhị hợp:**")
-                # Hiển thị dàn dạng badge
-                nhi_hop_html = "<div style='display: flex; flex-wrap: wrap; gap: 5px;'>"
-                for num in combos:
-                    nhi_hop_html += f"<span style='background-color: #e3f2fd; color: #1976d2; padding: 4px 10px; border-radius: 4px; font-weight: 500; font-size: 14px;'>{num}</span>"
-                nhi_hop_html += "</div>"
-                st.markdown(nhi_hop_html, unsafe_allow_html=True)
-            
-            # === BẢNG TAM GIÁC THEO DÕI ===
-            st.write("**📋 Bảng theo dõi:**")
-            
-            # Tính số ngày có thể kiểm tra
-            max_days = min(check_range, i - backtest_offset) if backtest_offset > 0 else min(check_range, i)
-            
-            if max_days > 0:
-                # Tạo bảng HTML tam giác NGƯỢC (ngày gần nhất ở trên)
-                table_html = "<table style='border-collapse: collapse; margin: 10px 0;'>"
+            for row_idx, day_data in enumerate(all_days_data):
+                date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
+                dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
+                table_html += f"<tr><td style='padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;'>{date}</td>"
+                table_html += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>{source}</td>"
+                table_html += f"<td style='padding: 6px; border: 1px solid #ddd; font-size: 11px;'>{dan_str}</td>"
+                table_html += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>{len(combos)}</td>"
                 
-                # Header
-                table_html += "<tr>"
-                for k in range(1, max_days + 1):
-                    table_html += f"<th style='padding: 8px; border: 1px solid #ddd; background-color: #f5f5f5; min-width: 50px; text-align: center; font-size: 13px;'>N{k}</th>"
+                num_cols_this_row = num_days - row_idx
+                for k in range(1, num_cols_this_row + 1):
+                    idx = i - k
+                    cell_val, bg_color, text_color = "", "white", "black"
+                    if idx >= 0:
+                        val_res = df_full.iloc[idx][col_comp]
+                        if val_res in combos:
+                            cell_val, bg_color, text_color = "✅", "#d4edda", "green"
+                        else:
+                            cell_val, bg_color, text_color = "--", "#fff3cd", "#856404"
+                    table_html += f"<td style='padding: 8px; border: 1px solid #ddd; background-color: {bg_color}; color: {text_color}; font-weight: bold; text-align: center;'>{cell_val}</td>"
+                
+                for _ in range(row_idx):
+                    table_html += "<td style='border: 1px solid #eee; background-color: #f9f9f9;'></td>"
                 table_html += "</tr>"
-                
-                # Rows - TAM GIÁC NGƯỢC (từ 1 cột → max_days cột)
-                for row_idx in range(max_days):
-                    table_html += "<tr>"
-                    
-                    # Số cột trong hàng này = row_idx + 1
-                    num_cols = row_idx + 1
-                    
-                    for k in range(1, num_cols + 1):
-                        idx = i - k
-                        cell_val = ""
-                        bg_color = "white"
-                        text_color = "black"
-                        
-                        if idx >= 0:
-                            val_res = df_full.iloc[idx][col_comp]
-                            if val_res in combos:
-                                cell_val = "✅"
-                                bg_color = "#d4edda"
-                                text_color = "green"
-                            else:
-                                cell_val = "--"
-                                bg_color = "#f8d7da"
-                                text_color = "#721c24"
-                        
-                        table_html += f"<td style='padding: 8px; border: 1px solid #ddd; background-color: {bg_color}; color: {text_color}; font-weight: bold; text-align: center; font-size: 14px;'>{cell_val}</td>"
-                    
-                    # Thêm ô trống cho phần còn lại
-                    for _ in range(max_days - num_cols):
-                        table_html += "<td style='border: none;'></td>"
-                    
-                    table_html += "</tr>"
-                
-                table_html += "</table>"
-                st.markdown(table_html, unsafe_allow_html=True)
-                
-                # === THỐNG KÊ ===
-                total_checks = sum(range(1, max_days + 1))  # 1 + 2 + 3 + ... + max_days
-                hits = 0
-                
-                for row_idx in range(max_days):
-                    for k in range(1, row_idx + 2):
-                        idx = i - k
-                        if idx >= 0:
-                            val_res = df_full.iloc[idx][col_comp]
-                            if val_res in combos:
-                                hits += 1
-                
-                hit_rate = round(hits / total_checks * 100, 1) if total_checks > 0 else 0
-                
-                col_stat1, col_stat2, col_stat3 = st.columns(3)
-                col_stat1.metric("Tổng kiểm tra", total_checks)
-                col_stat2.metric("Đã trúng", hits)
-                col_stat3.metric("Tỷ lệ", f"{hit_rate}%")
-            else:
-                st.warning("⚠️ Không đủ dữ liệu để kiểm tra")
+            
+            table_html += "</table>"
+            st.markdown(table_html, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.subheader("📊 Thống kê")
+            total_days, total_checks, total_hits = len(all_days_data), 0, 0
+            for row_idx, day_data in enumerate(all_days_data):
+                combos, i = day_data['combos'], day_data['index']
+                for k in range(1, num_days - row_idx + 1):
+                    idx = i - k
+                    if idx >= 0:
+                        total_checks += 1
+                        if df_full.iloc[idx][col_comp] in combos:
+                            total_hits += 1
+            
+            hit_rate = round(total_hits / total_checks * 100, 1) if total_checks > 0 else 0
+            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+            col_s1.metric("Tổng ngày", total_days)
+            col_s2.metric("Tổng kiểm tra", total_checks)
+            col_s3.metric("Đã trúng", total_hits)
+            col_s4.metric("Tỷ lệ", f"{hit_rate}%")
+
 
 with tabs[2]:
     st.subheader("Soi Cầu Bệt (GĐB/G1)")

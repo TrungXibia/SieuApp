@@ -11,10 +11,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS TÙY CHỈNH (Fix lỗi màu chữ menu) ---
+# --- CSS TÙY CHỈNH (Fix lỗi màu chữ menu & Tối ưu bảng) ---
 st.markdown("""
 <style>
-    /* Tùy chỉnh Tab */
+    /* Tùy chỉnh Tab: Ép màu chữ đen để hiện rõ trên nền xám */
     .stTabs [data-baseweb="tab-list"] { gap: 4px; }
     
     .stTabs [data-baseweb="tab"] {
@@ -23,7 +23,7 @@ st.markdown("""
         border-radius: 5px 5px 0 0;
         padding-top: 10px;
         padding-bottom: 10px;
-        color: #000000 !important; /* Ép màu chữ đen để không bị chìm trong Dark Mode */
+        color: #000000 !important; /* QUAN TRỌNG: Ép màu chữ đen */
         font-weight: 600;
     }
     
@@ -43,6 +43,7 @@ st.markdown("""
 def load_all_data(num_days):
     dt = data_fetcher.fetch_dien_toan(num_days)
     tt = data_fetcher.fetch_than_tai(num_days)
+    # XSMB và G1 cần dữ liệu Điện Toán để lấy ngày
     xsmb = data_fetcher.fetch_phoi_cau_xsmb(num_days, dt)
     g1 = data_fetcher.fetch_giai_nhat(num_days, dt)
     return dt, tt, xsmb, g1
@@ -50,7 +51,7 @@ def load_all_data(num_days):
 # --- 2. SIDEBAR ---
 with st.sidebar:
     st.title("🐔 SIÊU GÀ TOOL")
-    st.caption("Giao diện mới: Dễ nhìn hơn")
+    st.caption("Giao diện mới: Bảng chéo tích ngày")
     st.markdown("---")
     days_fetch = st.number_input("Số ngày tải dữ liệu", 50, 365, 100, step=50)
     days_show = st.slider("Số ngày hiển thị", 10, 100, 30)
@@ -103,7 +104,7 @@ with tabs[0]:
 
 # === TAB 2: DÀN NUÔI (ĐÃ SỬA BẢNG CHÉO) ===
 with tabs[1]:
-    st.markdown("### 🎯 Phân Tích Hiệu Quả Dàn Nuôi")
+    st.markdown("### 🎯 Phân Tích Hiệu Quả Dàn Nuôi (Dạng Bảng)")
     
     # Control Panel
     with st.container():
@@ -113,7 +114,7 @@ with tabs[1]:
         with c_ctrl2:
             source_comp = st.selectbox("So sánh với:", ["GĐB", "G1"])
         with c_ctrl3:
-            check_range = st.slider("Khung nuôi (ngày):", 3, 20, 10)
+            check_range = st.slider("Khung nuôi (ngày):", 3, 25, 10)
 
     if st.button("🚀 Chạy Phân Tích", type="primary"):
         source_list = [x["number"] for x in tt_show] if res_type == "Thần tài" else ["".join(x["numbers"]) for x in dt_show]
@@ -137,7 +138,7 @@ with tabs[1]:
             
             for k in range(1, check_range + 1):
                 check_idx = i - k
-                col_name = f"{k}" # Tên cột ngắn gọn: 1, 2, 3...
+                col_name = f"{k}" # Tên cột ngắn gọn: 1, 2, 3... thay vì K1, K2
                 
                 val_ref = ""
                 if check_idx >= 0:
@@ -145,7 +146,7 @@ with tabs[1]:
                 
                 if val_ref and val_ref in combos:
                     hits += 1
-                    k_cols[col_name] = f"✅ {val_ref}" # Đánh dấu tích
+                    k_cols[col_name] = f"✅ {val_ref}" # Đánh dấu tích + số trúng
                     if not first_hit_day: first_hit_day = f"N{k}"
                 else:
                     k_cols[col_name] = "" # Ô trống cho dễ nhìn
@@ -153,8 +154,8 @@ with tabs[1]:
             row = {
                 "Ngày": dt_show[i]['date'],
                 "Nguồn": val,
-                "Dàn": f"{len(combos)} số", # Rút gọn hiển thị dàn
-                "Trạng thái": f"Ăn {first_hit_day}" if hits > 0 else "⏳",
+                "Dàn": f"{len(combos)} số", # Rút gọn hiển thị dàn cho đỡ rối
+                "Kết quả": f"Ăn {first_hit_day}" if hits > 0 else "⏳",
             }
             row.update(k_cols)
             results.append(row)
@@ -169,7 +170,7 @@ with tabs[1]:
                 "Ngày": st.column_config.TextColumn("Ngày", width="small"),
                 "Nguồn": st.column_config.TextColumn("Nguồn", width="small"),
                 "Dàn": st.column_config.TextColumn("SL", width="small"),
-                "Trạng thái": st.column_config.TextColumn("Kết quả", width="small"),
+                "Kết quả": st.column_config.TextColumn("Tổng kết", width="small"),
             }
             
             # Cấu hình các cột ngày K (1, 2, 3...) cho nhỏ lại
@@ -180,8 +181,9 @@ with tabs[1]:
                     width="small" 
                 )
 
-            # 2. Hàm tô màu nền
+            # 2. Hàm tô màu nền (Highlight)
             def highlight_hits(val):
+                # Tô màu xanh lá cho ô trúng
                 if "✅" in str(val):
                     return 'background-color: #d4edda; color: #155724; font-weight: bold; text-align: center;'
                 return ''
@@ -191,17 +193,17 @@ with tabs[1]:
                     return 'background-color: #c3e6cb; color: darkgreen; font-weight: bold;'
                 return 'background-color: #f8d7da; color: #721c24;'
 
-            # 3. Hiển thị
+            # 3. Hiển thị Dataframe với Styler
             st.dataframe(
                 df_res.style
                       .applymap(highlight_hits, subset=k_columns)
-                      .applymap(highlight_status, subset=['Trạng thái']),
+                      .applymap(highlight_status, subset=['Kết quả']),
                 column_config=col_cfg,
                 use_container_width=True,
                 hide_index=True
             )
             
-            st.caption("*Hướng dẫn: N1, N2... là ngày thứ 1, thứ 2 sau khi có số. Ô màu xanh là trúng.*")
+            st.caption("*Ghi chú: N1, N2... là ngày thứ 1, thứ 2 nuôi. Ô màu xanh là trúng số đó.*")
 
 # === TAB 3: BỆT (BET) ===
 with tabs[2]:

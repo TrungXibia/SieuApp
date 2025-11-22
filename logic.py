@@ -8,16 +8,30 @@ BO_DICT = {
     "13": ["13","31","18","81","36","63","68","86"], "14": ["14","41","19","91","46","64","69","96"], "23": ["23","32","28","82","73","37","78","87"],
     "24": ["24","42","29","92","74","47","79","97"], "34": ["34","43","39","93","84","48","89","98"]
 }
+# Tạo map ngược để tra cứu siêu tốc O(1)
 REVERSE_BO = {v: k for k, vals in BO_DICT.items() for v in vals}
 
-# --- HÀM XỬ LÝ ---
-def bo(db: str) -> str:
-    if not db or not db.isdigit(): return "??"
-    return REVERSE_BO.get(db[-2:], "??")
+KEP_DICT = {
+    "K.AM": ["07","70","14","41","29","92","36","63","58","85"],
+    "K.BANG": ["00","11","22","33","44","55","66","77","88","99"],
+    "K.LECH": ["05","50","16","61","27","72","38","83","49","94"],
+    "S.KEP": ["01","10","12","21","23","32","34","43","45","54","56","65","67","76","78","87","89","98","09","90"]
+}
 
+# --- HÀM TRA CỨU ---
+def bo(db: str) -> str:
+    if not db: return "??"
+    return REVERSE_BO.get(db.zfill(2), "44")
+
+def kep(db: str) -> str:
+    db = db.zfill(2)
+    for key, vals in KEP_DICT.items():
+        if db in vals: return key
+    return "-"
+
+# --- LOGIC NÂNG CAO ---
 def tim_chu_so_bet(d1, d2, kieu):
-    """Tìm số bệt giữa 2 chuỗi số"""
-    if not d1 or not d2: return []
+    """Tìm chữ số bệt giữa 2 dãy số (list hoặc str)"""
     d1, d2 = list(str(d1)), list(str(d2))
     bet = []
     min_len = min(len(d1), len(d2))

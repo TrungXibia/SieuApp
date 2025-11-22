@@ -354,6 +354,7 @@ with tabs[1]:
                         'total': len(nhi_hop_list)
                     })
                 
+                
                 # Hiển thị theo từng ngày với badge màu
                 for idx, item in enumerate(nhi_hop_by_date):
                     # Tạo badge ngày với màu

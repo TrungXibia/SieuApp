@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import logic
 import data_fetcher
+import concurrent.futures
 
-# --- CẤU HÌNH GIAO DIỆN ---
+# --- CẤU HÌNH ---
 st.set_page_config(
     page_title="SIÊU GÀ APP - PRO",
     page_icon="🐔",
@@ -11,298 +12,227 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS TÙY CHỈNH (Fix lỗi màu chữ menu & Tối ưu bảng) ---
+# --- CSS FIX LỖI FONT & GIAO DIỆN ---
 st.markdown("""
 <style>
-    /* Tùy chỉnh Tab: Ép màu chữ đen để hiện rõ trên nền xám */
+    /* Fix lỗi font menu bị chìm trong dark mode */
     .stTabs [data-baseweb="tab-list"] { gap: 4px; }
-    
     .stTabs [data-baseweb="tab"] {
         height: 50px;
-        background-color: #e0e0e0; /* Nền xám nhạt */
+        background-color: #e0e0e0;
         border-radius: 5px 5px 0 0;
-        padding-top: 10px;
-        padding-bottom: 10px;
-        color: #000000 !important; /* QUAN TRỌNG: Ép màu chữ đen */
+        padding: 10px;
+        color: #000000 !important; /* Ép màu chữ đen */
         font-weight: 600;
     }
-    
     .stTabs [aria-selected="true"] {
-        background-color: #ff4b4b !important; /* Màu đỏ cho tab đang chọn */
-        color: #ffffff !important; /* Chữ trắng cho tab đang chọn */
+        background-color: #ff4b4b !important;
+        color: #ffffff !important;
         border-top: 2px solid #ff4b4b;
     }
-
-    /* Tùy chỉnh bảng dataframe cho gọn */
-    div[data-testid="stDataFrame"] { width: 100%; }
+    /* Căn giữa ô bảng */
+    .stDataFrame td { vertical-align: middle !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. QUẢN LÝ DỮ LIỆU (CACHE) ---
-@st.cache_data(ttl=3600) 
-def load_all_data(num_days):
-    dt = data_fetcher.fetch_dien_toan(num_days)
-    tt = data_fetcher.fetch_than_tai(num_days)
-    # XSMB và G1 cần dữ liệu Điện Toán để lấy ngày
-    xsmb = data_fetcher.fetch_phoi_cau_xsmb(num_days, dt)
-    g1 = data_fetcher.fetch_giai_nhat(num_days, dt)
-    return dt, tt, xsmb, g1
+# --- QUẢN LÝ DỮ LIỆU ---
+@st.cache_data(ttl=1800)
+def get_master_data(num_days):
+    # Tải song song tất cả các nguồn
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        f_dt = executor.submit(data_fetcher.fetch_dien_toan, num_days)
+        f_tt = executor.submit(data_fetcher.fetch_than_tai, num_days)
+        f_mb = executor.submit(data_fetcher.fetch_xsmb_group, num_days)
+        
+        dt = f_dt.result()
+        tt = f_tt.result()
+        mb_db, mb_g1 = f_mb.result()
 
-# --- 2. SIDEBAR ---
+    # Xử lý khớp ngày (Quan trọng để không bị lệch)
+    df_dt = pd.DataFrame(dt)
+    df_tt = pd.DataFrame(tt)
+    
+    xsmb_rows = []
+    limit = min(len(dt), len(mb_db), len(mb_g1))
+    for i in range(limit):
+        xsmb_rows.append({
+            "date": dt[i]["date"], # Dùng ngày của Điện Toán làm chuẩn
+            "xsmb_full": mb_db[i],
+            "xsmb_2so": mb_db[i][-2:],
+            "g1_full": mb_g1[i],
+            "g1_2so": mb_g1[i][-2:]
+        })
+    df_xsmb = pd.DataFrame(xsmb_rows)
+
+    # Gộp thành bảng tổng (Master Table)
+    if not df_dt.empty and not df_xsmb.empty:
+        df = pd.merge(df_dt, df_tt, on="date", how="left")
+        df = pd.merge(df, df_xsmb, on="date", how="left")
+        return df
+    return pd.DataFrame()
+
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("🐔 SIÊU GÀ TOOL")
-    st.caption("Giao diện mới: Bảng chéo tích ngày")
-    st.markdown("---")
-    days_fetch = st.number_input("Số ngày tải dữ liệu", 50, 365, 100, step=50)
-    days_show = st.slider("Số ngày hiển thị", 10, 100, 30)
-    
-    if st.button("🔄 Cập nhật dữ liệu", type="primary"):
+    st.caption("Version: Matrix View")
+    days_fetch = st.number_input("Số ngày tải:", 30, 365, 60, step=10)
+    days_show = st.slider("Hiển thị:", 10, 100, 20)
+    if st.button("🔄 Tải lại dữ liệu", type="primary"):
         st.cache_data.clear()
         st.rerun()
 
 # --- LOAD DATA ---
 try:
-    with st.spinner("Đang tải dữ liệu..."):
-        full_dt, full_tt, full_xsmb, full_g1 = load_all_data(days_fetch)
+    with st.spinner("🚀 Đang tải dữ liệu đa luồng..."):
+        df_full = get_master_data(days_fetch)
+        if df_full.empty:
+            st.error("Không có dữ liệu. Kiểm tra kết nối mạng.")
+            st.stop()
 except Exception as e:
-    st.error(f"Lỗi kết nối hoặc dữ liệu: {e}")
+    st.error(f"Lỗi: {e}")
     st.stop()
 
-# Cắt dữ liệu hiển thị
-dt_show = full_dt[:days_show]
-tt_show = full_tt[:days_show]
-xsmb_show = full_xsmb[:days_show]
-g1_show = full_g1[:days_show]
+df_show = df_full.head(days_show).copy()
 
-# --- 3. MAIN TABS ---
-tabs = st.tabs(["📊 KẾT QUẢ", "🎯 DÀN NUÔI", "🎲 BỆT (BET)", "📈 THỐNG KÊ L2", "🔍 DÒ CẦU"])
+# --- TABS ---
+tabs = st.tabs(["📊 KẾT QUẢ", "🎯 DÀN NUÔI (MATRIX)", "🎲 BỆT CẦU", "🔍 TRA CỨU"])
 
 # === TAB 1: KẾT QUẢ ===
 with tabs[0]:
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("##### Điện Toán 123")
-        if dt_show:
-            df_dt = pd.DataFrame(dt_show)
-            df_dt['Chuỗi số'] = df_dt['numbers'].apply(lambda x: " - ".join(x))
-            st.dataframe(df_dt[['date', 'Chuỗi số']], hide_index=True, use_container_width=True)
-    with c2:
-        st.markdown("##### Thần Tài")
-        if tt_show:
-            st.dataframe(pd.DataFrame(tt_show), hide_index=True, use_container_width=True)
+    df_disp = df_show.copy()
+    df_disp['Điện Toán'] = df_disp['dt_numbers'].apply(lambda x: " - ".join(x) if isinstance(x, list) else "")
     
-    st.divider()
-    c3, c4 = st.columns(2)
-    with c3:
-        st.markdown("##### XSMB (GĐB)")
-        if xsmb_show:
-            st.dataframe(pd.DataFrame(xsmb_show), hide_index=True, use_container_width=True)
-    with c4:
-        st.markdown("##### Giải Nhất (G1)")
-        if g1_show:
-            st.dataframe(pd.DataFrame(g1_show), hide_index=True, use_container_width=True)
+    st.dataframe(
+        df_disp[['date', 'Điện Toán', 'tt_number', 'xsmb_full', 'g1_full']],
+        column_config={
+            "date": st.column_config.TextColumn("Ngày", width="small"),
+            "Điện Toán": "Điện Toán 123",
+            "tt_number": "Thần Tài",
+            "xsmb_full": "Đặc Biệt",
+            "g1_full": "Giải Nhất"
+        },
+        hide_index=True, use_container_width=True
+    )
 
-# === TAB 2: DÀN NUÔI (ĐÃ SỬA BẢNG CHÉO) ===
+# === TAB 2: DÀN NUÔI (MATRIX VIEW) ===
 with tabs[1]:
-    st.markdown("### 🎯 Phân Tích Hiệu Quả Dàn Nuôi (Dạng Bảng)")
+    c1, c2, c3 = st.columns([1, 1, 2])
+    src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán"])
+    comp_mode = c2.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
+    check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
     
-    # Control Panel
-    with st.container():
-        c_ctrl1, c_ctrl2, c_ctrl3 = st.columns([1, 1, 2])
-        with c_ctrl1:
-            res_type = st.selectbox("Nguồn lấy số:", ["Thần tài", "Điện toán"])
-        with c_ctrl2:
-            source_comp = st.selectbox("So sánh với:", ["GĐB", "G1"])
-        with c_ctrl3:
-            check_range = st.slider("Khung nuôi (ngày):", 3, 25, 10)
-
-    if st.button("🚀 Chạy Phân Tích", type="primary"):
-        source_list = [x["number"] for x in tt_show] if res_type == "Thần tài" else ["".join(x["numbers"]) for x in dt_show]
-        ref_data = full_xsmb if source_comp == "GĐB" else full_g1
+    if st.button("🚀 Phân Tích Bảng Chéo", type="primary"):
+        res_list = []
+        col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
         
-        results = []
-        
-        # Loop xử lý
-        for i in range(len(source_list)):
-            val = source_list[i]
-            digits = list(val)
+        for i in range(len(df_show)):
+            row = df_full.iloc[i]
+            # Lấy nguồn số
+            src_str = ""
+            if src_mode == "Thần Tài": src_str = str(row.get('tt_number', ''))
+            elif src_mode == "Điện Toán": src_str = "".join(row.get('dt_numbers', []))
             
-            # Tạo dàn (Bao gồm cả kép)
+            if not src_str or src_str == "nan": continue
+            
+            # Tạo dàn
+            digits = set(src_str)
             combos = {a+b for a in digits for b in digits}
-            if not combos: continue
-
-            # Check khung ngày
+            
+            # Check các ngày tương lai (Quá khứ so với index hiện tại)
             k_cols = {}
             hits = 0
-            first_hit_day = ""
+            first_hit = ""
             
             for k in range(1, check_range + 1):
-                check_idx = i - k
-                col_name = f"{k}" # Tên cột ngắn gọn: 1, 2, 3... thay vì K1, K2
+                idx = i - k
+                val_res = ""
+                cell_val = "" # Giá trị hiển thị trong ô
                 
-                val_ref = ""
-                if check_idx >= 0:
-                    val_ref = ref_data[check_idx]["number"][-2:]
+                if idx >= 0:
+                    val_res = df_full.iloc[idx][col_comp]
+                    if val_res in combos:
+                        hits += 1
+                        cell_val = f"✅ {val_res}"
+                        if not first_hit: first_hit = f"N{k}"
                 
-                if val_ref and val_ref in combos:
-                    hits += 1
-                    k_cols[col_name] = f"✅ {val_ref}" # Đánh dấu tích + số trúng
-                    if not first_hit_day: first_hit_day = f"N{k}"
-                else:
-                    k_cols[col_name] = "" # Ô trống cho dễ nhìn
+                k_cols[f"{k}"] = cell_val # Cột 1, 2, 3...
             
-            row = {
-                "Ngày": dt_show[i]['date'],
-                "Nguồn": val,
-                "Dàn": f"{len(combos)} số", # Rút gọn hiển thị dàn cho đỡ rối
-                "Kết quả": f"Ăn {first_hit_day}" if hits > 0 else "⏳",
+            r = {
+                "Ngày": row['date'],
+                "Nguồn": src_str,
+                "SL": len(combos),
+                "KQ": f"Ăn {first_hit}" if hits else "⏳"
             }
-            row.update(k_cols)
-            results.append(row)
-
-        df_res = pd.DataFrame(results)
-        
-        if not df_res.empty:
-            # --- TẠO BẢNG CHÉO ĐẸP ---
+            r.update(k_cols)
+            res_list.append(r)
             
-            # 1. Định nghĩa cột để hiển thị gọn
+        if res_list:
+            df_res = pd.DataFrame(res_list)
+            
+            # Config cột động
             col_cfg = {
                 "Ngày": st.column_config.TextColumn("Ngày", width="small"),
                 "Nguồn": st.column_config.TextColumn("Nguồn", width="small"),
-                "Dàn": st.column_config.TextColumn("SL", width="small"),
-                "Kết quả": st.column_config.TextColumn("Tổng kết", width="small"),
+                "SL": st.column_config.TextColumn("Dàn", width="small"),
+                "KQ": st.column_config.TextColumn("Trạng thái", width="small"),
             }
+            # Các cột ngày K thu nhỏ lại
+            cols_k = [str(k) for k in range(1, check_range + 1)]
+            for k in cols_k:
+                col_cfg[k] = st.column_config.TextColumn(f"N{k}", width="small")
             
-            # Cấu hình các cột ngày K (1, 2, 3...) cho nhỏ lại
-            k_columns = [str(k) for k in range(1, check_range + 1)]
-            for k in k_columns:
-                col_cfg[k] = st.column_config.TextColumn(
-                    f"N{k}", # Header hiển thị là N1, N2...
-                    width="small" 
-                )
-
-            # 2. Hàm tô màu nền (Highlight)
-            def highlight_hits(val):
-                # Tô màu xanh lá cho ô trúng
+            # Style màu sắc
+            def highlight_cells(val):
                 if "✅" in str(val):
-                    return 'background-color: #d4edda; color: #155724; font-weight: bold; text-align: center;'
+                    return 'background-color: #d4edda; color: green; font-weight: bold; text-align: center'
                 return ''
-
+            
             def highlight_status(val):
-                if "Ăn" in str(val):
-                    return 'background-color: #c3e6cb; color: darkgreen; font-weight: bold;'
-                return 'background-color: #f8d7da; color: #721c24;'
+                return 'background-color: #c3e6cb; color: darkgreen' if "Ăn" in str(val) else 'background-color: #f8d7da; color: maroon'
 
-            # 3. Hiển thị Dataframe với Styler
             st.dataframe(
-                df_res.style
-                      .applymap(highlight_hits, subset=k_columns)
-                      .applymap(highlight_status, subset=['Kết quả']),
+                df_res.style.applymap(highlight_cells, subset=cols_k)
+                            .applymap(highlight_status, subset=['KQ']),
                 column_config=col_cfg,
-                use_container_width=True,
-                hide_index=True
+                hide_index=True, use_container_width=True
             )
-            
-            st.caption("*Ghi chú: N1, N2... là ngày thứ 1, thứ 2 nuôi. Ô màu xanh là trúng số đó.*")
+            st.caption(f"*Chú thích: N1, N2... là ngày thứ 1, thứ 2 sau khi có cầu. Ô tích xanh là trúng.*")
 
-# === TAB 3: BỆT (BET) ===
+# === TAB 3: BỆT CẦU ===
 with tabs[2]:
-    st.markdown("### 🎲 Soi Cầu Bệt")
+    st.subheader("Soi Cầu Bệt (GĐB/G1)")
+    # Logic soi cầu bệt đơn giản
+    bet_data = []
+    for i in range(len(df_show) - 1):
+        curr = df_show.iloc[i]['xsmb_full']
+        prev = df_show.iloc[i+1]['xsmb_full']
+        if not curr or not prev: continue
+        
+        # Tìm bệt thẳng
+        d1, d2 = list(curr), list(prev)
+        bet_nums = logic.tim_chu_so_bet(d1, d2, "Thẳng")
+        
+        if bet_nums:
+             bet_data.append({
+                 "Ngày": df_show.iloc[i]['date'],
+                 "Hôm nay": curr,
+                 "Hôm qua": prev,
+                 "Số Bệt": ",".join(bet_nums)
+             })
     
-    c_b1, c_b2 = st.columns(2)
-    with c_b1:
-        bet_src_name = st.selectbox("Nguồn Bệt:", ["GĐB", "G1", "Thần Tài"])
-    with c_b2:
-        bet_opts = st.multiselect("Kiểu Bệt:", ["Bệt Phải", "Thẳng", "Bệt trái"], default=["Bệt Phải", "Thẳng"])
-    
-    if bet_src_name == "GĐB": src_dat = xsmb_show
-    elif bet_src_name == "G1": src_dat = g1_show
-    else: src_dat = tt_show
-    
-    gdb_tails = [x['number'][-2:] for x in full_xsmb]
-    
-    bet_rows = []
-    for i in range(len(src_dat)):
-        curr_item = src_dat[i]
-        next_item = src_dat[i+1] if i+1 < len(src_dat) else None
-        
-        if not next_item: continue
-        
-        d1, d2 = list(curr_item['number']), list(next_item['number'])
-        
-        found_bet = set()
-        for opt in bet_opts:
-            found_bet.update(logic.tim_chu_so_bet(d1, d2, opt))
-        
-        if found_bet:
-            dancham = logic.lay_dan_cham(list(found_bet))
-            t1 = gdb_tails[i] if i < len(gdb_tails) else ""
-            t2 = gdb_tails[i+1] if i+1 < len(gdb_tails) else ""
-            nhihop = logic.lay_nhi_hop(list(found_bet), list(t1)+list(t2))
-            
-            final_dan = sorted(set(dancham + nhihop))
-            
-            res_mai = gdb_tails[i-1] if i-1 >= 0 else "?"
-            is_win = "🏆 WIN" if res_mai in final_dan else "-"
-            
-            bet_rows.append({
-                "Ngày": curr_item['date'],
-                "Nguồn (Hôm nay)": curr_item['number'],
-                "Số Bệt": ",".join(sorted(found_bet)),
-                "Dàn Đề Xuất": " ".join(final_dan),
-                "Kết Quả Mai": f"{res_mai} ({is_win})"
-            })
-        
-    st.dataframe(pd.DataFrame(bet_rows), use_container_width=True)
+    if bet_data:
+        st.dataframe(pd.DataFrame(bet_data), use_container_width=True)
+    else:
+        st.info("Không tìm thấy cầu bệt trong phạm vi hiển thị.")
 
-# === TAB 4: LAST 2 ===
+# === TAB 4: TRA CỨU ===
 with tabs[3]:
-    st.markdown("### 📈 Thống Kê 2 Số Cuối")
-    l2_src = st.radio("Nguồn dữ liệu:", ["GĐB", "G1"], horizontal=True)
-    dat_l2 = full_xsmb if l2_src == "GĐB" else full_g1
-    
-    c_stat1, c_stat2 = st.columns([2, 1])
-    
-    with c_stat1:
-        rows_l2 = []
-        for x in dat_l2[:days_show]:
-            n = x['number'][-2:]
-            rows_l2.append({
-                "Ngày": x['date'],
-                "Số": n,
-                "Bộ": logic.bo(n),
-                "Tổng": (int(n[0])+int(n[1]))%10,
-                "Kép": logic.kep(n)
-            })
-        st.dataframe(pd.DataFrame(rows_l2), use_container_width=True, hide_index=True)
-    
-    with c_stat2:
-        st.info("🔴 **TOP BỘ GAN**")
-        all_tails = [x['number'][-2:] for x in dat_l2]
-        
-        last_seen = {}
-        for idx, val in enumerate(all_tails):
-            k = logic.bo(val)
-            if k not in last_seen: last_seen[k] = idx
-        
-        df_gan = pd.DataFrame([{"Bộ": k, "Số ngày": v} for k,v in last_seen.items()])
-        df_gan = df_gan.sort_values("Số ngày", ascending=False).head(10)
-        st.dataframe(df_gan, hide_index=True, use_container_width=True)
-
-# === TAB 5: DÒ CẦU ===
-with tabs[4]:
-    st.markdown("### 🔍 Tra Cứu Lịch Sử Cầu")
-    target = st.text_input("Nhập số muốn tìm (VD: 68):", max_chars=2)
-    
-    if target and len(target) == 2:
-        found = []
-        for x in full_xsmb[:days_fetch]:
-            if target in x['number']: found.append({"Ngày": x['date'], "Giải": "GĐB", "Số đầy đủ": x['number']})
-        for x in full_g1[:days_fetch]:
-            if target in x['number']: found.append({"Ngày": x['date'], "Giải": "G1", "Số đầy đủ": x['number']})
-        
-        if found:
-            st.success(f"Tìm thấy {len(found)} lần xuất hiện.")
-            st.dataframe(pd.DataFrame(found), use_container_width=True)
+    f_num = st.text_input("Nhập số cần tìm (VD: 88):", max_chars=2)
+    if f_num:
+        mask = df_full.apply(lambda r: f_num in str(r['xsmb_full']) or f_num in str(r['g1_full']), axis=1)
+        found = df_full[mask][['date', 'xsmb_full', 'g1_full']]
+        if not found.empty:
+            st.success(f"Tìm thấy {len(found)} kết quả.")
+            st.dataframe(found, use_container_width=True)
         else:
-            st.warning("Chưa thấy số này xuất hiện trong dữ liệu đã tải.")
+            st.warning("Không tìm thấy.")

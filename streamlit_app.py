@@ -95,7 +95,7 @@ except Exception as e:
 df_show = df_full.head(days_show).copy()
 
 # --- TABS ---
-tabs = st.tabs(["📊 KẾT QUẢ", "🎯 DÀN NUÔI (MATRIX)", "🎲 BỆT CẦU", "🔍 TRA CỨU"])
+tabs = st.tabs(["📊 KẾT QUẢ", "🎯 DÀN NUÔI (MATRIX)", "🎲 BỆT CẦU", "🔍 TRA CỨU", "🧠 CÔNG CỤ THÔNG MINH"])
 
 # === TAB 1: KẾT QUẢ ===
 with tabs[0]:
@@ -191,8 +191,8 @@ with tabs[1]:
                 return 'background-color: #c3e6cb; color: darkgreen' if "Ăn" in str(val) else 'background-color: #f8d7da; color: maroon'
 
             st.dataframe(
-                df_res.style.applymap(highlight_cells, subset=cols_k)
-                            .applymap(highlight_status, subset=['KQ']),
+                df_res.style.map(highlight_cells, subset=cols_k)
+                            .map(highlight_status, subset=['KQ']),
                 column_config=col_cfg,
                 hide_index=True, use_container_width=True
             )
@@ -229,10 +229,214 @@ with tabs[2]:
 with tabs[3]:
     f_num = st.text_input("Nhập số cần tìm (VD: 88):", max_chars=2)
     if f_num:
-        mask = df_full.apply(lambda r: f_num in str(r['xsmb_full']) or f_num in str(r['g1_full']), axis=1)
-        found = df_full[mask][['date', 'xsmb_full', 'g1_full']]
-        if not found.empty:
-            st.success(f"Tìm thấy {len(found)} kết quả.")
-            st.dataframe(found, use_container_width=True)
+        # Validation
+        if not f_num.isdigit() or len(f_num) > 2:
+            st.error("Vui lòng nhập số từ 0-99")
         else:
-            st.warning("Không tìm thấy.")
+            f_num = f_num.zfill(2)
+            mask = df_full.apply(lambda r: f_num in str(r['xsmb_full']) or f_num in str(r['g1_full']), axis=1)
+            found = df_full[mask][['date', 'xsmb_full', 'g1_full']]
+            if not found.empty:
+                st.success(f"Tìm thấy {len(found)} kết quả.")
+                st.dataframe(found, use_container_width=True)
+            else:
+                st.warning("Không tìm thấy.")
+
+# === TAB 5: CÔNG CỤ THÔNG MINH ===
+with tabs[4]:
+    st.header("🧠 Công cụ Phân tích Thông minh")
+    
+    tool_tabs = st.tabs(["🔢 Tần suất", "🎯 Dự đoán", "⏱️ Chu kỳ", "📊 Thống kê", "🔍 Pattern"])
+    
+    # Tool 1: Phân tích tần suất
+    with tool_tabs[0]:
+        st.subheader("Phân tích Tần suất Xuất hiện")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            source_col = st.selectbox("Chọn nguồn:", ["XSMB (ĐB)", "Giải Nhất"], key="freq_source")
+            top_n = st.slider("Số lượng hiển thị:", 5, 30, 15, key="freq_top")
+        
+        col_name = "xsmb_2so" if source_col == "XSMB (ĐB)" else "g1_2so"
+        
+        if st.button("📊 Phân tích", type="primary", key="freq_btn"):
+            freq_data = logic.phan_tich_tan_suat(df_full, col_name, top_n)
+            
+            if freq_data:
+                # Hiển thị bảng
+                df_freq = pd.DataFrame([
+                    {"Số": k, "Số lần": v, "Tỷ lệ %": round(v/len(df_full)*100, 1)}
+                    for k, v in freq_data.items()
+                ])
+                
+                col_a, col_b = st.columns([1, 1])
+                with col_a:
+                    st.dataframe(df_freq, use_container_width=True, hide_index=True)
+                
+                # Biểu đồ
+                with col_b:
+                    import plotly.graph_objects as go
+                    fig = go.Figure(data=[
+                        go.Bar(x=list(freq_data.keys()), y=list(freq_data.values()),
+                               marker_color='lightblue', text=list(freq_data.values()),
+                               textposition='auto')
+                    ])
+                    fig.update_layout(title="Biểu đồ Tần suất", xaxis_title="Số", 
+                                     yaxis_title="Số lần", height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+    
+    # Tool 2: Dự đoán bộ số
+    with tool_tabs[1]:
+        st.subheader("Dự đoán Bộ số Thông minh")
+        st.caption("Dựa trên phân tích tần suất và chu kỳ")
+        
+        pred_source = st.selectbox("Chọn nguồn:", ["XSMB (ĐB)", "Giải Nhất"], key="pred_source")
+        pred_col = "xsmb_2so" if pred_source == "XSMB (ĐB)" else "g1_2so"
+        
+        if st.button("🎯 Dự đoán", type="primary", key="pred_btn"):
+            predictions = logic.du_doan_bo_so(df_full, pred_col, 15)
+            
+            if predictions:
+                df_pred = pd.DataFrame(predictions)
+                df_pred.columns = ["Số", "Tần suất", "Chu kỳ TB", "Ngày chưa về", "Độ tin cậy %"]
+                
+                # Highlight theo độ tin cậy
+                def color_confidence(val):
+                    if isinstance(val, (int, float)):
+                        if val >= 80: return 'background-color: #d4edda; font-weight: bold'
+                        elif val >= 60: return 'background-color: #fff3cd'
+                        else: return 'background-color: #f8d7da'
+                    return ''
+                
+                st.dataframe(
+                    df_pred.style.map(color_confidence, subset=['Độ tin cậy %']),
+                    use_container_width=True, hide_index=True
+                )
+                
+                st.info("💡 **Gợi ý:** Số có độ tin cậy cao và đã lâu chưa về có khả năng xuất hiện sớm.")
+            else:
+                st.warning("Không đủ dữ liệu để dự đoán.")
+    
+    # Tool 3: Phân tích chu kỳ
+    with tool_tabs[2]:
+        st.subheader("Phân tích Chu kỳ Xuất hiện")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            cycle_num = st.text_input("Nhập số cần phân tích (00-99):", max_chars=2, key="cycle_num")
+        with col2:
+            cycle_source = st.selectbox("Nguồn:", ["XSMB (ĐB)", "Giải Nhất"], key="cycle_source")
+        
+        if cycle_num and cycle_num.isdigit():
+            cycle_col = "xsmb_2so" if cycle_source == "XSMB (ĐB)" else "g1_2so"
+            cycle_info = logic.tim_chu_ky(df_full, cycle_num, cycle_col)
+            
+            if cycle_info["so_lan_xuat_hien"] > 0:
+                col_a, col_b, col_c = st.columns(3)
+                col_a.metric("Số lần xuất hiện", cycle_info["so_lan_xuat_hien"])
+                
+                if cycle_info["chu_ky_trung_binh"]:
+                    col_b.metric("Chu kỳ trung bình", f"{cycle_info['chu_ky_trung_binh']} ngày")
+                    col_c.metric("Ngày chưa về", f"{cycle_info['lan_gan_nhat']} ngày")
+                    
+                    # Biểu đồ khoảng cách
+                    if cycle_info["khoang_cach"]:
+                        import plotly.graph_objects as go
+                        fig = go.Figure(data=[
+                            go.Scatter(y=cycle_info["khoang_cach"], mode='lines+markers',
+                                      line=dict(color='royalblue', width=2),
+                                      marker=dict(size=8))
+                        ])
+                        fig.update_layout(title="Khoảng cách giữa các lần xuất hiện",
+                                         xaxis_title="Lần", yaxis_title="Số ngày", height=300)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        avg = cycle_info["chu_ky_trung_binh"]
+                        last = cycle_info["lan_gan_nhat"]
+                        if last >= avg * 0.9:
+                            st.success(f"🔥 Số {cycle_num.zfill(2)} đã {last} ngày chưa về, gần đến chu kỳ TB ({avg} ngày)!")
+                        else:
+                            st.info(f"Số {cycle_num.zfill(2)} mới về {last} ngày trước.")
+                else:
+                    st.warning("Chưa đủ dữ liệu để tính chu kỳ (cần ít nhất 2 lần xuất hiện).")
+            else:
+                st.warning(f"Số {cycle_num.zfill(2)} chưa xuất hiện trong dữ liệu.")
+    
+    # Tool 4: Thống kê nâng cao
+    with tool_tabs[3]:
+        st.subheader("Thống kê Nâng cao")
+        
+        stat_type = st.radio("Chọn loại thống kê:", 
+                            ["Cặp số thường đi cùng", "Phân bố tổng quát"],
+                            horizontal=True)
+        
+        if stat_type == "Cặp số thường đi cùng":
+            if st.button("📊 Phân tích", key="pair_btn"):
+                pairs = logic.thong_ke_cap_so(df_full, "xsmb_2so", "g1_2so")
+                
+                if pairs:
+                    df_pairs = pd.DataFrame(pairs)
+                    df_pairs.columns = ["Cặp số (ĐB - G1)", "Số lần cùng xuất hiện"]
+                    st.dataframe(df_pairs, use_container_width=True, hide_index=True)
+                    st.caption("*Các cặp số xuất hiện cùng ngày (ĐB và G1)*")
+                else:
+                    st.info("Không tìm thấy cặp số nào xuất hiện >= 2 lần.")
+        
+        else:  # Phân bố tổng quát
+            import plotly.graph_objects as go
+            import numpy as np
+            
+            # Lấy tất cả số từ ĐB
+            all_nums = df_full['xsmb_2so'].dropna().astype(str).str.zfill(2).tolist()
+            
+            # Tạo heat map 10x10
+            matrix = np.zeros((10, 10))
+            for num in all_nums:
+                if len(num) == 2:
+                    row, col = int(num[0]), int(num[1])
+                    matrix[row][col] += 1
+            
+            fig = go.Figure(data=go.Heatmap(
+                z=matrix,
+                x=list(range(10)),
+                y=list(range(10)),
+                colorscale='YlOrRd',
+                text=matrix.astype(int),
+                texttemplate="%{text}",
+                textfont={"size": 10}
+            ))
+            fig.update_layout(title="Heat Map Tần suất (Hàng chục x Đơn vị)",
+                            xaxis_title="Đơn vị", yaxis_title="Hàng chục",
+                            height=500)
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Tool 5: Tìm Pattern
+    with tool_tabs[4]:
+        st.subheader("Tìm Pattern Lặp lại")
+        st.caption("Phát hiện chuỗi số xuất hiện liên tiếp nhiều lần")
+        
+        pattern_source = st.selectbox("Nguồn:", ["XSMB (ĐB)", "Giải Nhất"], key="pattern_source")
+        pattern_col = "xsmb_2so" if pattern_source == "XSMB (ĐB)" else "g1_2so"
+        
+        if st.button("🔍 Tìm Pattern", type="primary", key="pattern_btn"):
+            patterns = logic.phan_tich_pattern(df_full, pattern_col, min_length=2)
+            
+            if patterns:
+                df_patterns = pd.DataFrame(patterns)
+                df_patterns.columns = ["Pattern", "Độ dài", "Số lần lặp", "Vị trí (5 đầu)"]
+                
+                # Highlight pattern xuất hiện nhiều
+                def highlight_freq(val):
+                    if isinstance(val, int):
+                        if val >= 5: return 'background-color: #d4edda; font-weight: bold'
+                        elif val >= 3: return 'background-color: #fff3cd'
+                    return ''
+                
+                st.dataframe(
+                    df_patterns.style.map(highlight_freq, subset=['Số lần lặp']),
+                    use_container_width=True, hide_index=True
+                )
+                
+                st.info("💡 **Gợi ý:** Pattern lặp lại nhiều lần có thể là dấu hiệu của chu kỳ đặc biệt.")
+            else:
+                st.warning("Không tìm thấy pattern nào lặp lại.")

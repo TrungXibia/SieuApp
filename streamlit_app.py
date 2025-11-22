@@ -361,21 +361,11 @@ with tabs[1]:
                     day_num = item['date'].split('-')[0] if '-' in item['date'] else item['date'][:2]
                     
                     # HTML cho badge ngày
-                    badge_html = f"""
-                    <div style="display: flex; align-items: center; margin: 10px 0;">
-                        <div style="background-color: #c9a0dc; color: white; padding: 5px 10px; 
-                                    border-radius: 5px; font-weight: bold; margin-right: 10px; min-width: 40px; text-align: center;">
-                            {day_num}
-                        </div>
-                        <div style="color: #888; font-size: 14px;">
-                            {item['date']} ({item['source']}): 
-                        </div>
-                    </div>
-                    """
+                    badge_html = f"""<div style="display: flex; align-items: center; margin: 10px 0;"><div style="background-color: #c9a0dc; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; margin-right: 10px; min-width: 40px; text-align: center;">{day_num}</div><div style="color: #888; font-size: 14px;">{item['date']} ({item['source']}): </div></div>"""
                     st.markdown(badge_html, unsafe_allow_html=True)
                     
                     # Hiển thị nhị hợp với màu theo tần suất
-                    nhi_hop_html = '<div style="display: flex; flex-wrap: wrap; gap: 5px; margin-left: 50px; margin-bottom: 15px;">'
+                    nhi_hop_html = "<div style='display: flex; flex-wrap: wrap; gap: 5px; margin-left: 50px; margin-bottom: 15px;'>"
                     
                     for num, freq in item['nhi_hop']:
                         # Chọn màu dựa trên tần suất
@@ -392,15 +382,9 @@ with tabs[1]:
                             bg_color = "#E0E0E0"  # Xám nhạt
                             text_color = "#404040"  # Xám đậm
                         
-                        nhi_hop_html += f'''
-                        <span style="background-color: {bg_color}; color: {text_color}; 
-                                     padding: 3px 8px; border-radius: 3px; font-weight: 500;
-                                     font-size: 14px; display: inline-block;">
-                            {num}
-                        </span>
-                        '''
+                        nhi_hop_html += f"<span style='background-color: {bg_color}; color: {text_color}; padding: 3px 8px; border-radius: 3px; font-weight: 500; font-size: 14px; display: inline-block;'>{num}</span>"
                     
-                    nhi_hop_html += '</div>'
+                    nhi_hop_html += "</div>"
                     st.markdown(nhi_hop_html, unsafe_allow_html=True)
                 
                 # === THỐNG KÊ MỨC SỐ ===

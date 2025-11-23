@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FIX LỖI FONT & GIAO DIỆN ---
+# --- CSS FIX LỖI FONT & GIAO DIỆN + RESPONSIVE ---
 st.markdown("""
 <style>
     /* Fix lỗi font menu bị chìm trong dark mode */
@@ -32,6 +32,168 @@ st.markdown("""
     }
     /* Căn giữa ô bảng */
     .stDataFrame td { vertical-align: middle !important; }
+    
+    /* === RESPONSIVE TABLE WRAPPER === */
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 10px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* === RESPONSIVE TABLE STYLES === */
+    .responsive-table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 12px;
+        min-width: 600px; /* Minimum width để table không bị vỡ */
+    }
+    
+    .responsive-table th {
+        padding: 6px 4px;
+        border: 1px solid #34495e;
+        background-color: #2c3e50;
+        color: white;
+        text-align: center;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        font-size: 11px;
+    }
+    
+    .responsive-table td {
+        padding: 5px 3px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+    }
+    
+    /* Sticky first 2 columns on desktop */
+    @media (min-width: 768px) {
+        .responsive-table th:nth-child(1),
+        .responsive-table td:nth-child(1) {
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            background-color: #2c3e50;
+        }
+        
+        .responsive-table td:nth-child(1) {
+            background-color: inherit;
+            font-weight: bold;
+        }
+        
+        .responsive-table th:nth-child(2),
+        .responsive-table td:nth-child(2) {
+            position: sticky;
+            left: 80px;
+            z-index: 5;
+        }
+    }
+    
+    /* === MOBILE RESPONSIVE (< 768px) === */
+    @media (max-width: 767px) {
+        .responsive-table {
+            font-size: 11px;
+            min-width: 100%;
+        }
+        
+        .responsive-table th {
+            padding: 4px 3px;
+            font-size: 10px;
+        }
+        
+        .responsive-table td {
+            padding: 4px 2px;
+            font-size: 11px;
+        }
+        
+        /* Giảm width cho cột ngày và giải */
+        .responsive-table th:nth-child(1),
+        .responsive-table td:nth-child(1) {
+            min-width: 70px;
+            font-size: 10px;
+        }
+        
+        .responsive-table th:nth-child(2),
+        .responsive-table td:nth-child(2) {
+            min-width: 50px;
+        }
+        
+        .responsive-table th:nth-child(3),
+        .responsive-table td:nth-child(3) {
+            min-width: 120px;
+            font-size: 9px;
+        }
+        
+        .responsive-table th:nth-child(4),
+        .responsive-table td:nth-child(4) {
+            min-width: 40px;
+        }
+        
+        /* Cột N1, N2, N3... */
+        .responsive-table th:nth-child(n+5),
+        .responsive-table td:nth-child(n+5) {
+            min-width: 32px;
+            padding: 3px 2px;
+        }
+    }
+    
+    /* === EXTRA SMALL MOBILE (< 480px) === */
+    @media (max-width: 479px) {
+        .responsive-table {
+            font-size: 10px;
+        }
+        
+        .responsive-table th {
+            padding: 3px 2px;
+            font-size: 9px;
+        }
+        
+        .responsive-table td {
+            padding: 3px 1px;
+            font-size: 10px;
+        }
+        
+        .responsive-table th:nth-child(1),
+        .responsive-table td:nth-child(1) {
+            min-width: 60px;
+            font-size: 9px;
+        }
+        
+        .responsive-table th:nth-child(2),
+        .responsive-table td:nth-child(2) {
+            min-width: 45px;
+        }
+        
+        .responsive-table th:nth-child(3),
+        .responsive-table td:nth-child(3) {
+            min-width: 100px;
+            font-size: 8px;
+        }
+        
+        .responsive-table th:nth-child(n+5),
+        .responsive-table td:nth-child(n+5) {
+            min-width: 30px;
+            padding: 2px 1px;
+        }
+    }
+    
+    /* Scroll indicator hint */
+    .scroll-hint {
+        text-align: center;
+        color: #7f8c8d;
+        font-size: 12px;
+        margin-top: 5px;
+        display: none;
+    }
+    
+    @media (max-width: 767px) {
+        .scroll-hint {
+            display: block;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -122,147 +284,167 @@ with tabs[1]:
     check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
     backtest_mode = c4.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
     
-    if st.button("🚀 Phân Tích", type="primary"):
-        backtest_offset = 0
-        if backtest_mode != "Hiện tại":
-            backtest_offset = int(backtest_mode.split()[1])
+    # Tự động phân tích
+    backtest_offset = 0
+    if backtest_mode != "Hiện tại":
+        backtest_offset = int(backtest_mode.split()[1])
+    
+    if backtest_offset > 0:
+        st.info(f"🔍 Backtest: Từ {backtest_offset} ngày trước")
+    
+    col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
+    
+    all_days_data = []
+    start_idx = backtest_offset
+    end_idx = min(backtest_offset + 20, len(df_show))
+    
+    for i in range(start_idx, end_idx):
+        row = df_full.iloc[i]
+        src_str = ""
+        if src_mode == "Thần Tài": 
+            src_str = str(row.get('tt_number', ''))
+        elif src_mode == "Điện Toán": 
+            src_str = "".join(row.get('dt_numbers', []))
         
-        if backtest_offset > 0:
-            st.info(f"🔍 Backtest: Từ {backtest_offset} ngày trước")
+        if not src_str or src_str == "nan": 
+            continue
         
-        col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
+        digits = set(src_str)
+        combos = sorted({a+b for a in digits for b in digits})
+        all_days_data.append({'date': row['date'], 'source': src_str, 'combos': combos, 'index': i})
+    
+    if not all_days_data:
+        st.warning("⚠️ Không có dữ liệu")
+    else:
+        st.markdown("### 📋 Bảng Theo Dõi")
         
-        all_days_data = []
-        start_idx = backtest_offset
-        end_idx = min(backtest_offset + 20, len(df_show))
+        # Wrapper div cho responsive
+        table_html = "<div class='table-wrapper'>"
+        table_html += "<table class='responsive-table'><tr>"
+        table_html += "<th>Ngày</th>"
+        table_html += "<th>Giải</th>"
+        table_html += "<th>Dàn nhị hợp</th>"
+        table_html += "<th>Mức</th>"
         
-        for i in range(start_idx, end_idx):
-            row = df_full.iloc[i]
-            src_str = ""
-            if src_mode == "Thần Tài": 
-                src_str = str(row.get('tt_number', ''))
-            elif src_mode == "Điện Toán": 
-                src_str = "".join(row.get('dt_numbers', []))
-            
-            if not src_str or src_str == "nan": 
-                continue
-            
-            digits = set(src_str)
-            combos = sorted({a+b for a in digits for b in digits})
-            all_days_data.append({'date': row['date'], 'source': src_str, 'combos': combos, 'index': i})
+        num_days = len(all_days_data)
+        for k in range(1, num_days + 1):
+            table_html += f"<th>N{k}</th>"
+        table_html += "</tr>"
         
-        if not all_days_data:
-            st.warning("⚠️ Không có dữ liệu")
-        else:
-            st.markdown("### 📋 Bảng Theo Dõi")
-            table_html = "<table style='border-collapse: collapse; width: 100%; font-size: 13px;'><tr>"
-            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 80px;'>Ngày</th>"
-            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 60px;'>Giải</th>"
-            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center;'>Dàn nhị hợp</th>"
-            table_html += "<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 50px;'>Mức</th>"
+        for row_idx, day_data in enumerate(all_days_data):
+            date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
+            dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
+            row_bg = "#f8f9fa" if row_idx % 2 == 0 else "#ffffff"
+            table_html += f"<tr style='background-color: {row_bg};'><td style='font-weight: bold; color: #2c3e50;'>{date}</td>"
+            table_html += f"<td style='color: #495057;'>{source}</td>"
+            table_html += f"<td style='font-size: 11px; color: #495057;'>{dan_str}</td>"
+            table_html += f"<td style='font-weight: 600; color: #2c3e50;'>{len(combos)}</td>"
             
-            num_days = len(all_days_data)
-            for k in range(1, num_days + 1):
-                table_html += f"<th style='padding: 10px; border: 1px solid #34495e; background-color: #2c3e50; color: white; text-align: center; min-width: 45px;'>N{k}</th>"
-            table_html += "</tr>"
-            
-            for row_idx, day_data in enumerate(all_days_data):
-                date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
-                dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
-                row_bg = "#f8f9fa" if row_idx % 2 == 0 else "#ffffff"
-                table_html += f"<tr style='background-color: {row_bg};'><td style='padding: 8px; border: 1px solid #dee2e6; text-align: center; font-weight: bold; color: #2c3e50;'>{date}</td>"
-                table_html += f"<td style='padding: 8px; border: 1px solid #dee2e6; text-align: center; color: #495057;'>{source}</td>"
-                table_html += f"<td style='padding: 6px; border: 1px solid #dee2e6; font-size: 11px; color: #495057;'>{dan_str}</td>"
-                table_html += f"<td style='padding: 8px; border: 1px solid #dee2e6; text-align: center; font-weight: 600; color: #2c3e50;'>{len(combos)}</td>"
-                
-                num_cols_this_row = row_idx + 1
-                for k in range(1, num_cols_this_row + 1):
-                    idx = i - k
-                    cell_val, bg_color, text_color = "", "#ecf0f1", "#7f8c8d"
-                    if idx >= 0:
-                        val_res = df_full.iloc[idx][col_comp]
-                        if val_res in combos:
-                            cell_val, bg_color, text_color = "✅", "#27ae60", "white"
-                        else:
-                            cell_val, bg_color, text_color = "--", "#e74c3c", "white"
-                    table_html += f"<td style='padding: 8px; border: 1px solid #dee2e6; background-color: {bg_color}; color: {text_color}; font-weight: bold; text-align: center;'>{cell_val}</td>"
-                
-                for _ in range(num_days - row_idx - 1):
-                    table_html += "<td style='border: 1px solid #dee2e6; background-color: #ecf0f1;'></td>"
-                table_html += "</tr>"
-            
-            table_html += "</table>"
-            st.markdown(table_html, unsafe_allow_html=True)
-            
-            st.markdown("---")
-            st.subheader("📊 Thống kê")
-            total_days, total_checks, total_hits = len(all_days_data), 0, 0
-            for row_idx, day_data in enumerate(all_days_data):
-                combos, i = day_data['combos'], day_data['index']
-                for k in range(1, row_idx + 2):
-                    idx = i - k
-                    if idx >= 0:
-                        total_checks += 1
-                        if df_full.iloc[idx][col_comp] in combos:
-                            total_hits += 1
-            
-            hit_rate = round(total_hits / total_checks * 100, 1) if total_checks > 0 else 0
-            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-            col_s1.metric("Tổng ngày", total_days)
-            col_s2.metric("Tổng kiểm tra", total_checks)
-            col_s3.metric("Đã trúng", total_hits)
-            col_s4.metric("Tỷ lệ", f"{hit_rate}%")
-            
-            # === TỔNG HỢP DÀN CHƯA RA ===
-            st.markdown("---")
-            st.subheader("🎯 Tổng hợp Dàn Chưa Ra")
-            st.caption("Các số chưa trúng trong tất cả các ngày, phân loại theo mức tần suất")
-            
-            all_pending_numbers = {}
-            for row_idx, day_data in enumerate(all_days_data):
-                combos = day_data['combos']
-                i = day_data['index']
-                num_cols_this_row = row_idx + 1
-                hit_numbers = set()
-                for k in range(1, num_cols_this_row + 1):
-                    idx = i - k
-                    if idx >= 0:
-                        val_res = df_full.iloc[idx][col_comp]
-                        if val_res in combos:
-                            hit_numbers.add(val_res)
-                pending = set(combos) - hit_numbers
-                for num in pending:
-                    all_pending_numbers[num] = all_pending_numbers.get(num, 0) + 1
-            
-            if all_pending_numbers:
-                from collections import defaultdict
-                level_groups = defaultdict(list)
-                for num, count in all_pending_numbers.items():
-                    level_groups[count].append(num)
-                
-                st.write("**Phân loại theo Mức (số lần xuất hiện trong các dàn):**")
-                for freq in sorted(level_groups.keys(), reverse=True):
-                    nums = sorted(level_groups[freq])
-                    count = len(nums)
-                    if freq >= 5:
-                        bg_color, text_color, icon, label = "#ffebee", "#c62828", "🔥", "HOT"
-                    elif freq >= 3:
-                        bg_color, text_color, icon, label = "#fff3e0", "#e65100", "⚡", "Quan tâm"
+            num_cols_this_row = row_idx + 1
+            for k in range(1, num_cols_this_row + 1):
+                idx = i - k
+                cell_val, bg_color, text_color = "", "#ecf0f1", "#7f8c8d"
+                if idx >= 0:
+                    val_res = df_full.iloc[idx][col_comp]
+                    if val_res in combos:
+                        cell_val, bg_color, text_color = "✅", "#27ae60", "white"
                     else:
-                        bg_color, text_color, icon, label = "#f5f5f5", "#616161", "📌", "Theo dõi"
-                    
-                    level_html = f"""<div style="background-color: {bg_color}; padding: 12px; margin: 8px 0; border-radius: 5px; border-left: 4px solid {text_color};"><div style="color: {text_color}; font-weight: bold; margin-bottom: 5px; font-size: 14px;">{icon} Mức {freq} ({count} số) - {label}</div><div style="color: {text_color}; font-size: 16px; font-weight: 500;">{', '.join(nums)}</div></div>"""
-                    st.markdown(level_html, unsafe_allow_html=True)
-                
-                total_pending = len(all_pending_numbers)
-                hot_pending = len([n for n, c in all_pending_numbers.items() if c >= 5])
-                col_p1, col_p2, col_p3 = st.columns(3)
-                col_p1.metric("Tổng số chưa ra", total_pending)
-                col_p2.metric("Số HOT (≥5 lần)", hot_pending)
-                col_p3.metric("Tỷ lệ HOT", f"{round(hot_pending/total_pending*100, 1)}%" if total_pending > 0 else "0%")
-                st.caption("**Ghi chú:** 🔥 HOT (≥5 lần) → Ưu tiên nuôi | ⚡ Quan tâm (3-4 lần) | 📌 Theo dõi (1-2 lần)")
-            else:
-                st.success("✅ Tất cả các số đều đã trúng!")
+                        cell_val, bg_color, text_color = "--", "#e74c3c", "white"
+                table_html += f"<td style='background-color: {bg_color}; color: {text_color}; font-weight: bold;'>{cell_val}</td>"
+            
+            for _ in range(num_days - row_idx - 1):
+                table_html += "<td style='background-color: #ecf0f1;'></td>"
+            table_html += "</tr>"
+        
+        table_html += "</table></div>"
+        table_html += "<div class='scroll-hint'>👆 Vuốt ngang để xem thêm →</div>"
+        st.markdown(table_html, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.subheader("📊 Thống kê")
+        total_days, total_checks, total_hits = len(all_days_data), 0, 0
+        for row_idx, day_data in enumerate(all_days_data):
+            combos, i = day_data['combos'], day_data['index']
+            for k in range(1, row_idx + 2):
+                idx = i - k
+                if idx >= 0:
+                    total_checks += 1
+                    if df_full.iloc[idx][col_comp] in combos:
+                        total_hits += 1
+        
+        hit_rate = round(total_hits / total_checks * 100, 1) if total_checks > 0 else 0
+        col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+        col_s1.metric("Tổng ngày", total_days)
+        col_s2.metric("Tổng kiểm tra", total_checks)
+        col_s3.metric("Đã trúng", total_hits)
+        col_s4.metric("Tỷ lệ", f"{hit_rate}%")
+        
+        # === TỔNG HỢP DÀN CHƯA RA ===
+        st.markdown("---")
+        st.subheader("🎯 Tổng hợp Dàn Chưa Ra")
+        st.caption("Các số chưa trúng trong tất cả các ngày")
+        
+        # Thu thập dữ liệu chi tiết: số -> {count, dates}
+        pending_details = {}
+        for row_idx, day_data in enumerate(all_days_data):
+            combos = day_data['combos']
+            date = day_data['date']
+            i = day_data['index']
+            num_cols_this_row = row_idx + 1
+            hit_numbers = set()
+            for k in range(1, num_cols_this_row + 1):
+                idx = i - k
+                if idx >= 0:
+                    val_res = df_full.iloc[idx][col_comp]
+                    if val_res in combos:
+                        hit_numbers.add(val_res)
+            pending = set(combos) - hit_numbers
+            for num in pending:
+                if num not in pending_details:
+                    pending_details[num] = {'count': 0, 'dates': []}
+                pending_details[num]['count'] += 1
+                pending_details[num]['dates'].append(date)
+        
+        if pending_details:
+            # Tạo danh sách chi tiết
+            detail_list = []
+            for num, info in pending_details.items():
+                detail_list.append({
+                    'Số': num,
+                    'Mức': info['count'],
+                    'Ngày xuất hiện': ', '.join(info['dates'][:5]) + ('...' if len(info['dates']) > 5 else '')
+                })
+            
+            # Sắp xếp theo Mức giảm dần, sau đó theo Số
+            detail_list.sort(key=lambda x: (-x['Mức'], x['Số']))
+            
+            # Hiển thị bảng chi tiết
+            st.markdown("**📋 Chi tiết từng số:**")
+            df_pending = pd.DataFrame(detail_list)
+            st.dataframe(df_pending, use_container_width=True, hide_index=True)
+            
+            # Nhóm theo mức - format đơn giản
+            st.markdown("---")
+            st.markdown("**📊 Nhóm theo Mức:**")
+            from collections import defaultdict
+            level_groups = defaultdict(list)
+            for num, info in pending_details.items():
+                level_groups[info['count']].append(num)
+            
+            for freq in sorted(level_groups.keys(), reverse=True):
+                nums = sorted(level_groups[freq])
+                st.write(f"**Mức {freq}** ({len(nums)} số): {', '.join(nums)}")
+            
+            # Thống kê tổng quan
+            st.markdown("---")
+            total_pending = len(pending_details)
+            hot_pending = len([n for n, info in pending_details.items() if info['count'] >= 5])
+            col_p1, col_p2, col_p3 = st.columns(3)
+            col_p1.metric("Tổng số chưa ra", total_pending)
+            col_p2.metric("Số HOT (≥5 lần)", hot_pending)
+            col_p3.metric("Tỷ lệ HOT", f"{round(hot_pending/total_pending*100, 1)}%" if total_pending > 0 else "0%")
+        else:
+            st.success("✅ Tất cả các số đều đã trúng!")
 
 
 with tabs[2]:

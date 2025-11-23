@@ -382,9 +382,9 @@ with tabs[1]:
         # === TỔNG HỢP DÀN CHƯA RA ===
         st.markdown("---")
         st.subheader("🎯 Tổng hợp Dàn Chưa Ra")
-        st.caption("Các số chưa trúng theo từng ngày")
+        st.caption("Các dàn nhị hợp chưa ra (chưa trúng số nào)")
         
-        # Thu thập dữ liệu theo ngày
+        # Thu thập dữ liệu theo ngày - chỉ những dàn HOÀN TOÀN chưa ra
         from datetime import datetime
         pending_by_date = []
         
@@ -395,6 +395,7 @@ with tabs[1]:
             num_cols_this_row = row_idx + 1
             hit_numbers = set()
             
+            # Kiểm tra xem có số nào trong dàn đã trúng chưa
             for k in range(1, num_cols_this_row + 1):
                 idx = i - k
                 if idx >= 0:
@@ -402,9 +403,8 @@ with tabs[1]:
                     if val_res in combos:
                         hit_numbers.add(val_res)
             
-            pending = set(combos) - hit_numbers
-            
-            if pending:
+            # Nếu CHƯA có số nào trúng (hit_numbers rỗng) thì dàn này chưa ra
+            if not hit_numbers:
                 # Parse date để lấy thứ
                 try:
                     date_obj = datetime.strptime(date, "%d/%m/%Y")
@@ -415,24 +415,47 @@ with tabs[1]:
                 
                 pending_by_date.append({
                     'Ngày': f"{weekday} {date}" if weekday else date,
-                    'Dàn nhị hợp chưa ra': ', '.join(sorted(pending)),
-                    'Số lượng': len(pending)
+                    'Dàn nhị hợp': ', '.join(sorted(combos)),
+                    'Số lượng': len(combos),
+                    'combos': combos  # Giữ lại để phân tích tần suất
                 })
         
         if pending_by_date:
             # Hiển thị bảng theo ngày
-            df_pending_by_date = pd.DataFrame(pending_by_date)
-            st.dataframe(df_pending_by_date, use_container_width=True, hide_index=True)
+            df_display = pd.DataFrame([{k: v for k, v in item.items() if k != 'combos'} for item in pending_by_date])
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            
+            # Phân tích tần suất các số trong các dàn chưa ra
+            st.markdown("---")
+            st.markdown("**📊 Mức số trong các dàn chưa ra:**")
+            st.caption("Đếm số lần xuất hiện của mỗi số trong tất cả các dàn chưa ra")
+            
+            # Đếm tần suất
+            from collections import defaultdict
+            number_frequency = defaultdict(int)
+            for item in pending_by_date:
+                for num in item['combos']:
+                    number_frequency[num] += 1
+            
+            # Nhóm theo mức
+            level_groups = defaultdict(list)
+            for num, freq in number_frequency.items():
+                level_groups[freq].append(num)
+            
+            # Hiển thị theo mức giảm dần
+            for freq in sorted(level_groups.keys(), reverse=True):
+                nums = sorted(level_groups[freq])
+                st.write(f"**Mức {freq}** ({len(nums)} số): {', '.join(nums)}")
             
             # Thống kê tổng quan
             st.markdown("---")
-            total_days_with_pending = len(pending_by_date)
-            total_unique_pending = len(set(num for item in pending_by_date for num in item['Dàn nhị hợp chưa ra'].split(', ')))
+            total_days_pending = len(pending_by_date)
+            total_unique_numbers = len(number_frequency)
             col_p1, col_p2 = st.columns(2)
-            col_p1.metric("Số ngày có dàn chưa ra", total_days_with_pending)
-            col_p2.metric("Tổng số unique chưa ra", total_unique_pending)
+            col_p1.metric("Số ngày có dàn chưa ra", total_days_pending)
+            col_p2.metric("Tổng số unique trong các dàn", total_unique_numbers)
         else:
-            st.success("✅ Tất cả các số đều đã trúng!")
+            st.success("✅ Tất cả các dàn đều đã ra (có ít nhất 1 số trúng)!")
 
 
 with tabs[2]:

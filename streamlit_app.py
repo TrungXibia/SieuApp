@@ -440,10 +440,18 @@ with tabs[1]:
                 for num in item['combos']:
                     number_frequency[num] += 1
             
-            # Nhóm theo mức
+            # Nhóm theo mức (bao gồm mức 0)
             level_groups = defaultdict(list)
             for num, freq in number_frequency.items():
                 level_groups[freq].append(num)
+            
+            # Tìm tất cả số từ 00-99 và thêm mức 0
+            all_possible_numbers = {f"{i:02d}" for i in range(100)}
+            numbers_in_pending = set(number_frequency.keys())
+            level_0_numbers = sorted(all_possible_numbers - numbers_in_pending)
+            
+            if level_0_numbers:
+                level_groups[0] = level_0_numbers
             
             # Hiển thị theo mức giảm dần
             for freq in sorted(level_groups.keys(), reverse=True):
@@ -517,7 +525,7 @@ with tabs[1]:
             
             cycle_analysis.append({
                 'Ngày': date,
-                'Dàn': ', '.join(sorted(combos)[:10]) + ('...' if len(combos) > 10 else ''),
+                'Dàn': ', '.join(sorted(combos)),
                 'Chu kỳ TB': avg_cycle if isinstance(avg_cycle, str) else f"{avg_cycle} ngày",
                 'Lần cuối ra': last_hit if isinstance(last_hit, str) else f"{last_hit} ngày trước",
                 'Nhận định': status

@@ -530,9 +530,54 @@ with tabs[1]:
             # Gợi ý ưu tiên
             st.markdown("---")
             st.markdown("**💡 Gợi ý ưu tiên theo dõi:**")
-            priority_count = sum(1 for item in cycle_analysis if "Ưu tiên cao" in item['Nhận định'] or "Chưa ra lần nào" in item['Nhận định'])
-            if priority_count > 0:
-                st.info(f"Có **{priority_count}** dàn cần ưu tiên theo dõi (quá hạn hoặc chưa ra lần nào)")
+            
+            # Lọc các dàn ưu tiên cao
+            priority_sets = [item for item in cycle_analysis if "Ưu tiên cao" in item['Nhận định'] or "Chưa ra lần nào" in item['Nhận định']]
+            
+            if priority_sets:
+                st.info(f"Có **{len(priority_sets)}** dàn cần ưu tiên theo dõi (quá hạn hoặc chưa ra lần nào)")
+                
+                # Hiển thị danh sách dàn ưu tiên
+                st.markdown("**📋 Danh sách dàn ưu tiên:**")
+                for idx, item in enumerate(priority_sets, 1):
+                    st.write(f"{idx}. **{item['Ngày']}**: {item['Dàn']} - _{item['Nhận định']}_")
+                
+                # Phân tích mức số trong các dàn ưu tiên
+                st.markdown("---")
+                st.markdown("**📊 Mức số trong các dàn ưu tiên:**")
+                
+                from collections import defaultdict
+                priority_number_freq = defaultdict(int)
+                
+                # Đếm tần suất từ dàn gốc (không phải string đã format)
+                for row_idx, day_data in enumerate(all_days_data):
+                    date = day_data['date']
+                    combos = day_data['combos']
+                    
+                    # Kiểm tra xem dàn này có trong danh sách ưu tiên không
+                    is_priority = any(p['Ngày'] == date for p in priority_sets)
+                    
+                    if is_priority:
+                        for num in combos:
+                            priority_number_freq[num] += 1
+                
+                # Nhóm theo mức (bao gồm mức 0)
+                level_groups_priority = defaultdict(list)
+                for num, freq in priority_number_freq.items():
+                    level_groups_priority[freq].append(num)
+                
+                # Tìm tất cả số từ 00-99 và thêm mức 0
+                all_possible_numbers = {f"{i:02d}" for i in range(100)}
+                numbers_in_priority = set(priority_number_freq.keys())
+                level_0_numbers = sorted(all_possible_numbers - numbers_in_priority)
+                
+                if level_0_numbers:
+                    level_groups_priority[0] = level_0_numbers
+                
+                # Hiển thị theo mức giảm dần
+                for freq in sorted(level_groups_priority.keys(), reverse=True):
+                    nums = sorted(level_groups_priority[freq])
+                    st.write(f"**Mức {freq}** ({len(nums)} số): {', '.join(nums)}")
             else:
                 st.success("Tất cả các dàn đang trong chu kỳ bình thường")
         else:

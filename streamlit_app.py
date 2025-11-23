@@ -344,7 +344,9 @@ with tabs[1]:
             for k in range(1, num_cols_this_row + 1):
                 idx = i - k
                 cell_val, bg_color, text_color = "", "#ecf0f1", "#7f8c8d"
-                if idx >= 0:
+                
+                # Chỉ hiển thị kết quả nếu idx >= backtest_offset (không xem "tương lai")
+                if idx >= 0 and idx >= backtest_offset:
                     val_res = df_full.iloc[idx][col_comp]
                     if val_res in combos:
                         cell_val, bg_color, text_color = "✅", "#27ae60", "white"
@@ -367,7 +369,8 @@ with tabs[1]:
             combos, i = day_data['combos'], day_data['index']
             for k in range(1, row_idx + 2):
                 idx = i - k
-                if idx >= 0:
+                # Chỉ tính nếu idx >= backtest_offset (không tính "tương lai")
+                if idx >= 0 and idx >= backtest_offset:
                     total_checks += 1
                     if df_full.iloc[idx][col_comp] in combos:
                         total_hits += 1
@@ -395,10 +398,10 @@ with tabs[1]:
             num_cols_this_row = row_idx + 1
             hit_numbers = set()
             
-            # Kiểm tra xem có số nào trong dàn đã trúng chưa
+            # Kiểm tra xem có số nào trong dàn đã trúng chưa (chỉ xét dữ liệu lịch sử)
             for k in range(1, num_cols_this_row + 1):
                 idx = i - k
-                if idx >= 0:
+                if idx >= 0 and idx >= backtest_offset:
                     val_res = df_full.iloc[idx][col_comp]
                     if val_res in combos:
                         hit_numbers.add(val_res)

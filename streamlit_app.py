@@ -296,7 +296,7 @@ with tabs[1]:
     
     all_days_data = []
     start_idx = backtest_offset
-    end_idx = min(backtest_offset + 20, len(df_show))
+    end_idx = min(backtest_offset + 20, len(df_full))  # Sử dụng df_full thay vì df_show
     
     for i in range(start_idx, end_idx):
         row = df_full.iloc[i]

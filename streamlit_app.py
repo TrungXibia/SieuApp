@@ -459,6 +459,84 @@ with tabs[1]:
             col_p2.metric("Tổng số unique trong các dàn", total_unique_numbers)
         else:
             st.success("✅ Tất cả các dàn đều đã ra (có ít nhất 1 số trúng)!")
+        
+        # === PHÂN TÍCH CHU KỲ & NHẬN ĐỊNH ===
+        st.markdown("---")
+        st.subheader("🔮 Phân tích Chu kỳ & Nhận định")
+        st.caption("Phân tích chu kỳ ra của các dàn và dự đoán")
+        
+        # Thu thập dữ liệu chu kỳ cho mỗi dàn
+        cycle_analysis = []
+        
+        for row_idx, day_data in enumerate(all_days_data):
+            combos = day_data['combos']
+            date = day_data['date']
+            i = day_data['index']
+            
+            # Tìm các lần dàn này đã ra (có ít nhất 1 số trúng)
+            hit_dates = []
+            days_since_last_hit = 0
+            
+            for check_idx in range(i + 1, len(df_full)):
+                if check_idx >= backtest_offset:
+                    val_res = df_full.iloc[check_idx][col_comp]
+                    if val_res in combos:
+                        days_from_start = check_idx - i
+                        hit_dates.append(days_from_start)
+            
+            # Tính chu kỳ
+            if hit_dates:
+                # Chu kỳ trung bình
+                if len(hit_dates) > 1:
+                    cycles = [hit_dates[j] - hit_dates[j-1] for j in range(1, len(hit_dates))]
+                    avg_cycle = round(sum(cycles) / len(cycles), 1)
+                else:
+                    avg_cycle = hit_dates[0]
+                
+                last_hit = hit_dates[0]  # Lần gần nhất (số ngày từ hôm nay)
+                
+                # Dự đoán lần ra tiếp theo
+                if avg_cycle > 0:
+                    predicted_next = round(last_hit + avg_cycle)
+                    if last_hit < avg_cycle:
+                        status = f"Sắp tới (còn ~{round(avg_cycle - last_hit)} ngày)"
+                    else:
+                        over_due = last_hit - avg_cycle
+                        if over_due > avg_cycle * 0.5:
+                            status = f"⚠️ Quá hạn {round(over_due)} ngày - Ưu tiên cao"
+                        else:
+                            status = f"Đã quá {round(over_due)} ngày"
+                else:
+                    predicted_next = "N/A"
+                    status = "Không đủ dữ liệu"
+            else:
+                avg_cycle = "Chưa ra"
+                last_hit = "Chưa bao giờ"
+                predicted_next = "N/A"
+                status = "🔥 Chưa ra lần nào - Theo dõi sát"
+            
+            cycle_analysis.append({
+                'Ngày': date,
+                'Dàn': ', '.join(sorted(combos)[:10]) + ('...' if len(combos) > 10 else ''),
+                'Chu kỳ TB': avg_cycle if isinstance(avg_cycle, str) else f"{avg_cycle} ngày",
+                'Lần cuối ra': last_hit if isinstance(last_hit, str) else f"{last_hit} ngày trước",
+                'Nhận định': status
+            })
+        
+        if cycle_analysis:
+            df_cycle = pd.DataFrame(cycle_analysis)
+            st.dataframe(df_cycle, use_container_width=True, hide_index=True)
+            
+            # Gợi ý ưu tiên
+            st.markdown("---")
+            st.markdown("**💡 Gợi ý ưu tiên theo dõi:**")
+            priority_count = sum(1 for item in cycle_analysis if "Ưu tiên cao" in item['Nhận định'] or "Chưa ra lần nào" in item['Nhận định'])
+            if priority_count > 0:
+                st.info(f"Có **{priority_count}** dàn cần ưu tiên theo dõi (quá hạn hoặc chưa ra lần nào)")
+            else:
+                st.success("Tất cả các dàn đang trong chu kỳ bình thường")
+        else:
+            pass  # Không có dữ liệu để phân tích chu kỳ
 
 
 with tabs[2]:

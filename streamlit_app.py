@@ -476,24 +476,40 @@ with tabs[1]:
         # Thu thập dữ liệu chu kỳ cho mỗi dàn
         cycle_analysis = []
         
+        # Lấy ngày hiện tại (ngày mới nhất trong data)
+        from datetime import datetime
+        current_date_str = df_full.iloc[backtest_offset]['date']
+        current_date = datetime.strptime(current_date_str, "%d/%m/%Y")
+        
         for row_idx, day_data in enumerate(all_days_data):
             combos = day_data['combos']
             date = day_data['date']
             i = day_data['index']
             
+            # Parse ngày của dàn
+            set_date = datetime.strptime(date, "%d/%m/%Y")
+            
             # Tìm các lần dàn này đã ra (có ít nhất 1 số trúng)
-            hit_dates = []
-            days_since_last_hit = 0
+            hit_info = []  # [(ngày_trúng, số_ngày_từ_dàn)]
             
             for check_idx in range(i + 1, len(df_full)):
                 if check_idx >= backtest_offset:
                     val_res = df_full.iloc[check_idx][col_comp]
                     if val_res in combos:
-                        days_from_start = check_idx - i
-                        hit_dates.append(days_from_start)
+                        hit_date_str = df_full.iloc[check_idx]['date']
+                        hit_date = datetime.strptime(hit_date_str, "%d/%m/%Y")
+                        days_from_set = (hit_date - set_date).days
+                        hit_info.append((hit_date, days_from_set))
+            
+            # Tính số ngày từ khi tạo dàn đến hiện tại
+            days_since_creation = (current_date - set_date).days
             
             # Tính chu kỳ
-            if hit_dates:
+            if hit_info:
+                # Sắp xếp theo ngày gần nhất
+                hit_info.sort(key=lambda x: x[1])
+                hit_dates = [h[1] for h in hit_info]
+                
                 # Chu kỳ trung bình
                 if len(hit_dates) > 1:
                     cycles = [hit_dates[j] - hit_dates[j-1] for j in range(1, len(hit_dates))]
@@ -501,15 +517,16 @@ with tabs[1]:
                 else:
                     avg_cycle = hit_dates[0]
                 
-                last_hit = hit_dates[0]  # Lần gần nhất (số ngày từ hôm nay)
+                last_hit = hit_dates[0]  # Lần gần nhất (số ngày từ khi tạo dàn)
+                days_since_last_hit = days_since_creation - last_hit
                 
                 # Dự đoán lần ra tiếp theo
                 if avg_cycle > 0:
                     predicted_next = round(last_hit + avg_cycle)
-                    if last_hit < avg_cycle:
-                        status = f"Sắp tới (còn ~{round(avg_cycle - last_hit)} ngày)"
+                    if days_since_last_hit < avg_cycle:
+                        status = f"Sắp tới (còn ~{round(avg_cycle - days_since_last_hit)} ngày)"
                     else:
-                        over_due = last_hit - avg_cycle
+                        over_due = days_since_last_hit - avg_cycle
                         if over_due > avg_cycle * 0.5:
                             status = f"⚠️ Quá hạn {round(over_due)} ngày - Ưu tiên cao"
                         else:
@@ -518,21 +535,40 @@ with tabs[1]:
                     predicted_next = "N/A"
                     status = "Không đủ dữ liệu"
             else:
+                # Chưa ra lần nào
                 avg_cycle = "Chưa ra"
                 last_hit = "Chưa bao giờ"
                 predicted_next = "N/A"
-                status = "🔥 Chưa ra lần nào - Theo dõi sát"
+                days_since_last_hit = days_since_creation
+                over_due = 0
+                
+                if days_since_creation == 0:
+                    status = "🆕 Mới tạo hôm nay"
+                elif days_since_creation == 1:
+                    status = "🔥 Chưa ra (1 ngày) - Theo dõi sát"
+                else:
+                    status = f"🔥 Chưa ra ({days_since_creation} ngày) - Theo dõi sát"
             
             cycle_analysis.append({
                 'Ngày': date,
                 'Dàn': ', '.join(sorted(combos)),
                 'Chu kỳ TB': avg_cycle if isinstance(avg_cycle, str) else f"{avg_cycle} ngày",
-                'Lần cuối ra': last_hit if isinstance(last_hit, str) else f"{last_hit} ngày trước",
-                'Nhận định': status
+                'Lần cuối ra': last_hit if isinstance(last_hit, str) else f"{last_hit} ngày từ tạo dàn",
+                'Nhận định': status,
+                # Thêm các trường ẩn để sắp xếp
+                '_sort_priority': 0 if "Chưa ra" in status else (1 if "Quá hạn" in status else 2),
+                '_overdue_days': over_due if 'over_due' in locals() else 0,
+                '_days_since_creation': days_since_creation
             })
         
         if cycle_analysis:
-            df_cycle = pd.DataFrame(cycle_analysis)
+            # Sắp xếp: Ưu tiên chưa ra lần nào (lâu nhất), sau đó quá hạn nhiều ngày nhất, sau đó theo ngày tạo
+            cycle_analysis.sort(key=lambda x: (x['_sort_priority'], -x['_overdue_days'], -x['_days_since_creation']))
+            
+            # Loại bỏ các trường ẩn trước khi hiển thị
+            cycle_analysis_display = [{k: v for k, v in item.items() if not k.startswith('_')} for item in cycle_analysis]
+            
+            df_cycle = pd.DataFrame(cycle_analysis_display)
             st.dataframe(df_cycle, use_container_width=True, hide_index=True)
             
             # Gợi ý ưu tiên

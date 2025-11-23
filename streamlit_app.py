@@ -382,67 +382,55 @@ with tabs[1]:
         # === TỔNG HỢP DÀN CHƯA RA ===
         st.markdown("---")
         st.subheader("🎯 Tổng hợp Dàn Chưa Ra")
-        st.caption("Các số chưa trúng trong tất cả các ngày")
+        st.caption("Các số chưa trúng theo từng ngày")
         
-        # Thu thập dữ liệu chi tiết: số -> {count, dates}
-        pending_details = {}
+        # Thu thập dữ liệu theo ngày
+        from datetime import datetime
+        pending_by_date = []
+        
         for row_idx, day_data in enumerate(all_days_data):
             combos = day_data['combos']
             date = day_data['date']
             i = day_data['index']
             num_cols_this_row = row_idx + 1
             hit_numbers = set()
+            
             for k in range(1, num_cols_this_row + 1):
                 idx = i - k
                 if idx >= 0:
                     val_res = df_full.iloc[idx][col_comp]
                     if val_res in combos:
                         hit_numbers.add(val_res)
+            
             pending = set(combos) - hit_numbers
-            for num in pending:
-                if num not in pending_details:
-                    pending_details[num] = {'count': 0, 'dates': []}
-                pending_details[num]['count'] += 1
-                pending_details[num]['dates'].append(date)
-        
-        if pending_details:
-            # Tạo danh sách chi tiết
-            detail_list = []
-            for num, info in pending_details.items():
-                detail_list.append({
-                    'Số': num,
-                    'Mức': info['count'],
-                    'Ngày xuất hiện': ', '.join(info['dates'][:5]) + ('...' if len(info['dates']) > 5 else '')
+            
+            if pending:
+                # Parse date để lấy thứ
+                try:
+                    date_obj = datetime.strptime(date, "%d/%m/%Y")
+                    weekday_names = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"]
+                    weekday = weekday_names[date_obj.weekday()]
+                except:
+                    weekday = ""
+                
+                pending_by_date.append({
+                    'Ngày': f"{weekday} {date}" if weekday else date,
+                    'Dàn nhị hợp chưa ra': ', '.join(sorted(pending)),
+                    'Số lượng': len(pending)
                 })
-            
-            # Sắp xếp theo Mức giảm dần, sau đó theo Số
-            detail_list.sort(key=lambda x: (-x['Mức'], x['Số']))
-            
-            # Hiển thị bảng chi tiết
-            st.markdown("**📋 Chi tiết từng số:**")
-            df_pending = pd.DataFrame(detail_list)
-            st.dataframe(df_pending, use_container_width=True, hide_index=True)
-            
-            # Nhóm theo mức - format đơn giản
-            st.markdown("---")
-            st.markdown("**📊 Nhóm theo Mức:**")
-            from collections import defaultdict
-            level_groups = defaultdict(list)
-            for num, info in pending_details.items():
-                level_groups[info['count']].append(num)
-            
-            for freq in sorted(level_groups.keys(), reverse=True):
-                nums = sorted(level_groups[freq])
-                st.write(f"**Mức {freq}** ({len(nums)} số): {', '.join(nums)}")
+        
+        if pending_by_date:
+            # Hiển thị bảng theo ngày
+            df_pending_by_date = pd.DataFrame(pending_by_date)
+            st.dataframe(df_pending_by_date, use_container_width=True, hide_index=True)
             
             # Thống kê tổng quan
             st.markdown("---")
-            total_pending = len(pending_details)
-            hot_pending = len([n for n, info in pending_details.items() if info['count'] >= 5])
-            col_p1, col_p2, col_p3 = st.columns(3)
-            col_p1.metric("Tổng số chưa ra", total_pending)
-            col_p2.metric("Số HOT (≥5 lần)", hot_pending)
-            col_p3.metric("Tỷ lệ HOT", f"{round(hot_pending/total_pending*100, 1)}%" if total_pending > 0 else "0%")
+            total_days_with_pending = len(pending_by_date)
+            total_unique_pending = len(set(num for item in pending_by_date for num in item['Dàn nhị hợp chưa ra'].split(', ')))
+            col_p1, col_p2 = st.columns(2)
+            col_p1.metric("Số ngày có dàn chưa ra", total_days_with_pending)
+            col_p2.metric("Tổng số unique chưa ra", total_unique_pending)
         else:
             st.success("✅ Tất cả các số đều đã trúng!")
 

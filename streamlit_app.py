@@ -761,6 +761,10 @@ with tabs[5]:
             current_day = dt_show[i]
             date_str = shorten_date(current_day['date'])
             kq_str = "".join(current_day['numbers'])
+            
+            # Lấy kết quả ĐB từ df_show
+            xsmb_db = df_show.iloc[i].get('xsmb_full', '')
+            
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
             counts_map = {str(d): merged_str.count(str(d)) for d in range(10)}
@@ -769,7 +773,7 @@ with tabs[5]:
             for digit, count in counts_map.items():
                 freq_groups.setdefault(count, []).append(digit)
             
-            row = {"Ngày": date_str, "KQ": kq_str}
+            row = {"Ngày": date_str, "KQ": kq_str, "Kết quả ĐB": str(xsmb_db)}
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             top_3 = sorted_freqs[:3]
             disp_grps = []
@@ -782,12 +786,13 @@ with tabs[5]:
             freq_rows_digits.append(row)
 
         df_digits = pd.DataFrame(freq_rows_digits)
-        cols = ["Ngày", "KQ"] + [str(f) for f in range(16) if str(f) in df_digits.columns] + ["TOP 3"]
+        cols = ["Ngày", "KQ", "Kết quả ĐB"] + [str(f) for f in range(16) if str(f) in df_digits.columns] + ["TOP 3"]
         df_digits = df_digits[cols]
 
         col_cfg_digits = {
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
             "KQ": st.column_config.TextColumn("KQ", width="medium"),
+            "Kết quả ĐB": st.column_config.TextColumn("Kết quả ĐB", width="small"),
             "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width="medium"),
         }
         for f in range(16):
@@ -801,7 +806,7 @@ with tabs[5]:
                 if col == "TOP 3":
                     styles.append('background-color: #ffffcc; color: #d63031; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
-                if col in ["Ngày", "KQ"]: styles.append(""); continue
+                if col in ["Ngày", "KQ", "Kết quả ĐB"]: styles.append(""); continue
                 try:
                     freq = int(col)
                     if not val: styles.append("")
@@ -823,7 +828,11 @@ with tabs[5]:
         for i in range(len(dt_show) - 6):
             current_day = dt_show[i]
             date_str = shorten_date(current_day['date'])
-            kq_short = " ".join(current_day['numbers']) 
+            kq_short = " ".join(current_day['numbers'])
+            
+            # Lấy kết quả ĐB từ df_show
+            xsmb_db = df_show.iloc[i].get('xsmb_full', '')
+            
             window_7_days = dt_show[i : i+7]
             merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
             counts_map = {}
@@ -837,7 +846,7 @@ with tabs[5]:
                 freq_groups.setdefault(count, []).append(pair)
                 if count > max_freq: max_freq = count
             
-            row = {"Ngày": date_str, "KQ": kq_short}
+            row = {"Ngày": date_str, "KQ": kq_short, "Kết quả ĐB": str(xsmb_db)}
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             top_2 = sorted_freqs[:2]
             disp_grps = []
@@ -852,12 +861,13 @@ with tabs[5]:
             freq_rows_pairs.append(row)
 
         df_pairs = pd.DataFrame(freq_rows_pairs)
-        cols_p = ["Ngày", "KQ"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 2"]
+        cols_p = ["Ngày", "KQ", "Kết quả ĐB"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 2"]
         df_pairs = df_pairs[cols_p]
 
         col_cfg_pairs = {
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
             "KQ": st.column_config.TextColumn("Kết Quả", width="medium"),
+            "Kết quả ĐB": st.column_config.TextColumn("Kết quả ĐB", width="small"),
             "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width="large"),
         }
         for f in range(limit_col):
@@ -871,7 +881,7 @@ with tabs[5]:
                 if col == "TOP 2":
                     styles.append('background-color: #e6f7ff; color: #0050b3; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
-                if col in ["Ngày", "KQ"]: styles.append(""); continue
+                if col in ["Ngày", "KQ", "Kết quả ĐB"]: styles.append(""); continue
                 try:
                     freq = int(col)
                     if not val: styles.append("")

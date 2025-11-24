@@ -727,6 +727,114 @@ with tabs[3]:
         gan_nums = [{"Số": k, "Gan": v} for k,v in last_seen_num.items()]
         df_gan_nums = pd.DataFrame(gan_nums).sort_values("Gan", ascending=False).head(10)
         st.dataframe(df_gan_nums.T, use_container_width=True)
+    
+    # === MỨC SỐ CỦA CÁC DÀN GAN ===
+    st.divider()
+    st.markdown("### 📊 Mức Số của các Dàn Gan")
+    st.caption("Phân tích tần suất xuất hiện của các số trong tất cả các dàn gan")
+    
+    # Thu thập tất cả các số từ các dàn gan
+    from collections import defaultdict
+    number_frequency = defaultdict(int)
+    
+    # Duyệt qua tất cả các dàn gan và đếm tần suất
+    for item in stats:
+        if item and item['Dàn']:
+            # Parse dàn (có thể là dạng "12,34,56" hoặc "12 34 56")
+            dan_str = str(item['Dàn'])
+            # Tách các số (dùng cả dấu phấy và khoảng trắng)
+            numbers = dan_str.replace(',', ' ').split()
+            for num in numbers:
+                num = num.strip()
+                if num and len(num) == 2 and num.isdigit():
+                    number_frequency[num] += 1
+    
+    # Nhóm theo mức (bao gồm mức 0)
+    level_groups = defaultdict(list)
+    for num, freq in number_frequency.items():
+        level_groups[freq].append(num)
+    
+    # Tìm tất cả số từ 00-99 và thêm mức 0
+    all_possible_numbers = {f"{i:02d}" for i in range(100)}
+    numbers_in_gan = set(number_frequency.keys())
+    level_0_numbers = sorted(all_possible_numbers - numbers_in_gan)
+    
+    if level_0_numbers:
+        level_groups[0] = level_0_numbers
+    
+    # Hiển thị theo mức giảm dần
+    col_muc1, col_muc2 = st.columns([1, 3])
+    
+    with col_muc1:
+        st.info("📈 Thống kê tổng quan")
+        st.metric("Tổng số dàn gan", len([s for s in stats if s]))
+        st.metric("Số unique trong dàn", len(number_frequency))
+        st.metric("Số hoàn toàn không có", len(level_0_numbers))
+        max_level = max(level_groups.keys()) if level_groups else 0
+        st.metric("Mức cao nhất", max_level)
+    
+    with col_muc2:
+        st.success("🎯 Bảng Mức Số")
+        
+        # Tạo bảng hiển thị đẹp hơn
+        muc_data = []
+        for freq in sorted(level_groups.keys(), reverse=True):
+            nums = sorted(level_groups[freq])
+            nums_display = ', '.join(nums)
+            muc_data.append({
+                "Mức": freq,
+                "Số lượng": len(nums),
+                "Các số": nums_display
+            })
+        
+        df_muc = pd.DataFrame(muc_data)
+        st.dataframe(
+            df_muc,
+            column_config={
+                "Mức": st.column_config.NumberColumn("Mức", width="small"),
+                "Số lượng": st.column_config.NumberColumn("Số lượng", width="small"),
+                "Các số": st.column_config.TextColumn("Các số", width="large")
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=400
+        )
+    
+    # Phân tích chi tiết
+    st.divider()
+    st.markdown("#### 🔍 Chi tiết theo mức")
+    
+    # Tạo tabs cho các mức khác nhau
+    levels = sorted(level_groups.keys(), reverse=True)
+    if len(levels) > 0:
+        # Chỉ hiển thị các mức có ý nghĩa (không hiển thị mức 0 nếu quá nhiều)
+        significant_levels = [l for l in levels if l > 0]
+        if 0 in levels and len(level_groups[0]) <= 50:
+            significant_levels.append(0)
+        
+        # Hiển thị từng mức
+        for freq in significant_levels[:10]:  # Giới hạn 10 mức để tránh quá dài
+            nums = sorted(level_groups[freq])
+            
+            # Định dạng màu sắc dựa trên mức
+            if freq == 0:
+                color_emoji = "⚪"
+                description = "Không xuất hiện trong bất kỳ dàn gan nào"
+            elif freq >= 5:
+                color_emoji = "🔴"
+                description = "Xuất hiện rất nhiều - Ưu tiên cao"
+            elif freq >= 3:
+                color_emoji = "🟠"
+                description = "Xuất hiện nhiều - Cần chú ý"
+            elif freq >= 2:
+                color_emoji = "🟡"
+                description = "Xuất hiện trung bình"
+            else:
+                color_emoji = "🟢"
+                description = "Xuất hiện ít"
+            
+            with st.expander(f"{color_emoji} **Mức {freq}** ({len(nums)} số) - {description}", expanded=(freq > 0 and freq >= 3)):
+                st.write(f"**Danh sách:** {', '.join(nums)}")
 
 # --- TAB 5: DÒ CẦU ---
 with tabs[4]:

@@ -928,9 +928,9 @@ with tabs[5]:
 
         col_cfg_digits = {
             "STT": st.column_config.NumberColumn("STT", width=30, help="Số thứ tự"),
-            "Ngày": st.column_config.TextColumn("Ngày", width=120),
-            "KQ": st.column_config.TextColumn("KQ", width=120, help="Kết quả theo nguồn đã chọn"),
-            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=100, help="Kết quả Đặc Biệt"),
+            "Ngày": st.column_config.TextColumn("Ngày", width=50),
+            "KQ": st.column_config.TextColumn("KQ", width=100, help="Kết quả theo nguồn đã chọn"),
+            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=70, help="Kết quả Đặc Biệt"),
             "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width=100),
         }
         for f in range(16):
@@ -1053,5 +1053,6 @@ with tabs[5]:
             return styles
 
         st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=True)
+
 
 

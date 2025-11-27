@@ -870,18 +870,26 @@ with tabs[5]:
             date_str = shorten_date(current_day['date'])
             kq_str = "".join(current_day['numbers'])
             
-            # Lấy kết quả ĐB từ df_show
+            # Lấy kết quả ĐB và TT từ df_show
             xsmb_db = df_show.iloc[i].get('xsmb_full', '')
+            tt_num = str(df_show.iloc[i].get('tt_number', ''))
             
+            # Nối Điện Toán + Thần Tài trong khung 7 ngày
             window_7_days = dt_show[i : i+7]
-            merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
+            merged_str = ""
+            for idx, day in enumerate(window_7_days):
+                merged_str += "".join(day['numbers'])  # Điện Toán
+                tt_val = str(df_show.iloc[i + idx].get('tt_number', ''))
+                if tt_val and tt_val != 'nan':
+                    merged_str += tt_val  # Thần Tài
+            
             counts_map = {str(d): merged_str.count(str(d)) for d in range(10)}
             
             freq_groups = {}
             for digit, count in counts_map.items():
                 freq_groups.setdefault(count, []).append(digit)
             
-            row = {"Ngày": date_str, "KQ": kq_str, "Kết quả ĐB": str(xsmb_db)}
+            row = {"STT": i + 1, "Ngày": date_str, "KQ (ĐT)": kq_str, "TT": tt_num, "KQ (ĐB)": str(xsmb_db)}
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             top_3 = sorted_freqs[:3]
             disp_grps = []
@@ -894,13 +902,15 @@ with tabs[5]:
             freq_rows_digits.append(row)
 
         df_digits = pd.DataFrame(freq_rows_digits)
-        cols = ["Ngày", "KQ", "Kết quả ĐB"] + [str(f) for f in range(16) if str(f) in df_digits.columns] + ["TOP 3"]
+        cols = ["STT", "Ngày", "KQ (ĐT)", "TT", "KQ (ĐB)"] + [str(f) for f in range(16) if str(f) in df_digits.columns] + ["TOP 3"]
         df_digits = df_digits[cols]
 
         col_cfg_digits = {
+            "STT": st.column_config.NumberColumn("STT", width="small", help="Số thứ tự"),
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-            "KQ": st.column_config.TextColumn("KQ", width="medium"),
-            "Kết quả ĐB": st.column_config.TextColumn("Kết quả ĐB", width="small"),
+            "KQ (ĐT)": st.column_config.TextColumn("KQ (ĐT)", width="medium", help="Kết quả Điện Toán"),
+            "TT": st.column_config.TextColumn("TT", width="small", help="Thần Tài"),
+            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width="small", help="Kết quả Đặc Biệt"),
             "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width="medium"),
         }
         for f in range(16):
@@ -914,7 +924,7 @@ with tabs[5]:
                 if col == "TOP 3":
                     styles.append('background-color: #ffffcc; color: #d63031; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
-                if col in ["Ngày", "KQ", "Kết quả ĐB"]: styles.append(""); continue
+                if col in ["STT", "Ngày", "KQ (ĐT)", "TT", "KQ (ĐB)"]: styles.append(""); continue
                 try:
                     freq = int(col)
                     if not val: styles.append("")
@@ -938,11 +948,19 @@ with tabs[5]:
             date_str = shorten_date(current_day['date'])
             kq_short = " ".join(current_day['numbers'])
             
-            # Lấy kết quả ĐB từ df_show
+            # Lấy kết quả ĐB và TT từ df_show
             xsmb_db = df_show.iloc[i].get('xsmb_full', '')
+            tt_num = str(df_show.iloc[i].get('tt_number', ''))
             
+            # Nối Điện Toán + Thần Tài trong khung 7 ngày
             window_7_days = dt_show[i : i+7]
-            merged_str = "".join(["".join(day['numbers']) for day in window_7_days])
+            merged_str = ""
+            for idx, day in enumerate(window_7_days):
+                merged_str += "".join(day['numbers'])  # Điện Toán
+                tt_val = str(df_show.iloc[i + idx].get('tt_number', ''))
+                if tt_val and tt_val != 'nan':
+                    merged_str += tt_val  # Thần Tài
+            
             counts_map = {}
             for num in range(100):
                 pair = f"{num:02d}"
@@ -954,7 +972,7 @@ with tabs[5]:
                 freq_groups.setdefault(count, []).append(pair)
                 if count > max_freq: max_freq = count
             
-            row = {"Ngày": date_str, "KQ": kq_short, "Kết quả ĐB": str(xsmb_db)}
+            row = {"STT": i + 1, "Ngày": date_str, "KQ (ĐT)": kq_short, "TT": tt_num, "KQ (ĐB)": str(xsmb_db)}
             sorted_freqs = sorted(freq_groups.keys(), reverse=True)
             top_2 = sorted_freqs[:2]
             disp_grps = []
@@ -969,13 +987,15 @@ with tabs[5]:
             freq_rows_pairs.append(row)
 
         df_pairs = pd.DataFrame(freq_rows_pairs)
-        cols_p = ["Ngày", "KQ", "Kết quả ĐB"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 2"]
+        cols_p = ["STT", "Ngày", "KQ (ĐT)", "TT", "KQ (ĐB)"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 2"]
         df_pairs = df_pairs[cols_p]
 
         col_cfg_pairs = {
+            "STT": st.column_config.NumberColumn("STT", width="small", help="Số thứ tự"),
             "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-            "KQ": st.column_config.TextColumn("Kết Quả", width="medium"),
-            "Kết quả ĐB": st.column_config.TextColumn("Kết quả ĐB", width="small"),
+            "KQ (ĐT)": st.column_config.TextColumn("KQ (ĐT)", width="medium", help="Kết quả Điện Toán"),
+            "TT": st.column_config.TextColumn("TT", width="small", help="Thần Tài"),
+            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width="small", help="Kết quả Đặc Biệt"),
             "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width="large"),
         }
         for f in range(limit_col):
@@ -989,7 +1009,7 @@ with tabs[5]:
                 if col == "TOP 2":
                     styles.append('background-color: #e6f7ff; color: #0050b3; font-weight: bold; border-left: 2px solid #ccc;')
                     continue
-                if col in ["Ngày", "KQ", "Kết quả ĐB"]: styles.append(""); continue
+                if col in ["STT", "Ngày", "KQ (ĐT)", "TT", "KQ (ĐB)"]: styles.append(""); continue
                 try:
                     freq = int(col)
                     if not val: styles.append("")

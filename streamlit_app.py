@@ -922,11 +922,11 @@ with tabs[5]:
         df_digits = df_digits[cols]
 
         col_cfg_digits = {
-            "STT": st.column_config.NumberColumn("STT", width=50, help="Số thứ tự"),
+            "STT": st.column_config.NumberColumn("STT", width=30, help="Số thứ tự"),
             "Ngày": st.column_config.TextColumn("Ngày", width=80),
-            "KQ": st.column_config.TextColumn("KQ", width=150, help="Kết quả theo nguồn đã chọn"),
-            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=80, help="Kết quả Đặc Biệt"),
-            "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width=120),
+            "KQ": st.column_config.TextColumn("KQ", width=120, help="Kết quả theo nguồn đã chọn"),
+            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=100, help="Kết quả Đặc Biệt"),
+            "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width=100),
         }
         for f in range(16):
             if str(f) in df_digits.columns:

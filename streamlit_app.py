@@ -922,15 +922,15 @@ with tabs[5]:
         df_digits = df_digits[cols]
 
         col_cfg_digits = {
-            "STT": st.column_config.NumberColumn("STT", width="small", help="Số thứ tự"),
-            "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-            "KQ": st.column_config.TextColumn("KQ", width="large", help="Kết quả theo nguồn đã chọn"),
-            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width="small", help="Kết quả Đặc Biệt"),
-            "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width="medium"),
+            "STT": st.column_config.NumberColumn("STT", width=50, help="Số thứ tự"),
+            "Ngày": st.column_config.TextColumn("Ngày", width=80),
+            "KQ": st.column_config.TextColumn("KQ", width=150, help="Kết quả theo nguồn đã chọn"),
+            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=80, help="Kết quả Đặc Biệt"),
+            "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width=120),
         }
         for f in range(16):
             if str(f) in df_digits.columns:
-                col_cfg_digits[str(f)] = st.column_config.TextColumn(str(f), width="small")
+                col_cfg_digits[str(f)] = st.column_config.TextColumn(str(f), width=60)
 
         def highlight_cols_digits(row):
             styles = []
@@ -950,7 +950,7 @@ with tabs[5]:
                 except: styles.append("")
             return styles
 
-        st.dataframe(df_digits.style.apply(highlight_cols_digits, axis=1), column_config=col_cfg_digits, hide_index=True, use_container_width=False)
+        st.dataframe(df_digits.style.apply(highlight_cols_digits, axis=1), column_config=col_cfg_digits, hide_index=True, use_container_width=True)
 
         st.divider()
 
@@ -1019,15 +1019,15 @@ with tabs[5]:
         df_pairs = df_pairs[cols_p]
 
         col_cfg_pairs = {
-            "STT": st.column_config.NumberColumn("STT", width="small", help="Số thứ tự"),
-            "Ngày": st.column_config.TextColumn("Ngày", width="small"),
-            "KQ": st.column_config.TextColumn("KQ", width="large", help="Kết quả theo nguồn đã chọn"),
-            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width="small", help="Kết quả Đặc Biệt"),
-            "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width="large"),
+            "STT": st.column_config.NumberColumn("STT", width=50, help="Số thứ tự"),
+            "Ngày": st.column_config.TextColumn("Ngày", width=80),
+            "KQ": st.column_config.TextColumn("KQ", width=150, help="Kết quả theo nguồn đã chọn"),
+            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=80, help="Kết quả Đặc Biệt"),
+            "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width=200),
         }
         for f in range(limit_col):
             if str(f) in df_pairs.columns:
-                col_cfg_pairs[str(f)] = st.column_config.TextColumn(str(f), width="small")
+                col_cfg_pairs[str(f)] = st.column_config.TextColumn(str(f), width=80)
 
         def highlight_cols_pairs(row):
             styles = []
@@ -1047,6 +1047,6 @@ with tabs[5]:
                 except: styles.append("")
             return styles
 
-        st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=False)
+        st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=True)
 
 

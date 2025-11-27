@@ -261,6 +261,11 @@ tabs = st.tabs(["📊 KẾT QUẢ", "🎯 DÀN NUÔI (MATRIX)", "🎲 BỆT CẦ
 
 # --- DATA PREPARATION FOR NEW TABS ---
 def shorten_date(d):
+    # Loại bỏ phần thứ nếu có (ví dụ: "Thứ Tư ngày 26-11-2025" -> "26/11")
+    if "ngày" in d:
+        d = d.split("ngày")[-1].strip()  # Lấy phần sau "ngày"
+    # Chuyển từ dd-mm-yyyy hoặc dd/mm/yyyy sang dd/mm
+    d = d.replace("-", "/")
     return "/".join(d.split("/")[:2])
 
 dt_show = []

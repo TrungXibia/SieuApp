@@ -915,7 +915,10 @@ with tabs[5]:
             freq_rows_digits.append(row)
 
         df_digits = pd.DataFrame(freq_rows_digits)
-        cols = ["STT", "Ngày", "KQ", "KQ (ĐB)"] + [str(f) for f in range(16) if str(f) in df_digits.columns] + ["TOP 3"]
+        # Lọc bỏ các cột tần suất rỗng
+        freq_cols = [str(f) for f in range(16) if str(f) in df_digits.columns]
+        non_empty_freq_cols = [col for col in freq_cols if df_digits[col].str.strip().any()]
+        cols = ["STT", "Ngày", "KQ", "KQ (ĐB)"] + non_empty_freq_cols + ["TOP 3"]
         df_digits = df_digits[cols]
 
         col_cfg_digits = {
@@ -1009,7 +1012,10 @@ with tabs[5]:
             freq_rows_pairs.append(row)
 
         df_pairs = pd.DataFrame(freq_rows_pairs)
-        cols_p = ["STT", "Ngày", "KQ", "KQ (ĐB)"] + [str(f) for f in range(limit_col) if str(f) in df_pairs.columns] + ["TOP 2"]
+        # Lọc bỏ các cột tần suất rỗng
+        freq_cols_p = [str(f) for f in range(limit_col) if str(f) in df_pairs.columns]
+        non_empty_freq_cols_p = [col for col in freq_cols_p if df_pairs[col].str.strip().any()]
+        cols_p = ["STT", "Ngày", "KQ", "KQ (ĐB)"] + non_empty_freq_cols_p + ["TOP 2"]
         df_pairs = df_pairs[cols_p]
 
         col_cfg_pairs = {

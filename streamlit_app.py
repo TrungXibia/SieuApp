@@ -302,7 +302,7 @@ with tabs[0]:
 # === TAB 2: DÀN NUÔI (SIMPLE VIEW) ===
 with tabs[1]:
     c1, c2, c3, c4 = st.columns([1, 1, 1.5, 1.5])
-    src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán"])
+    src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán", "Cả 2 (ĐT + TT)"])
     comp_mode = c2.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
     check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
     backtest_mode = c4.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
@@ -328,6 +328,11 @@ with tabs[1]:
             src_str = str(row.get('tt_number', ''))
         elif src_mode == "Điện Toán": 
             src_str = "".join(row.get('dt_numbers', []))
+        elif src_mode == "Cả 2 (ĐT + TT)":
+            dt_val = "".join(row.get('dt_numbers', []))
+            tt_val = str(row.get('tt_number', ''))
+            if tt_val == 'nan': tt_val = ""
+            src_str = dt_val + tt_val
         
         if not src_str or src_str == "nan": 
             continue
@@ -667,7 +672,7 @@ with tabs[2]:
         
         if bet_nums:
              bet_data.append({
-                 "Ngày": df_show.iloc[i]['date'],
+                 "Ngày": shorten_date(df_show.iloc[i]['date']),
                  "Hôm nay": curr,
                  "Hôm qua": prev,
                  "Số Bệt": ",".join(bet_nums)
@@ -929,8 +934,8 @@ with tabs[5]:
         col_cfg_digits = {
             "STT": st.column_config.NumberColumn("STT", width=30, help="Số thứ tự"),
             "Ngày": st.column_config.TextColumn("Ngày", width=50),
-            "KQ": st.column_config.TextColumn("KQ", width=100, help="Kết quả theo nguồn đã chọn"),
-            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=70, help="Kết quả Đặc Biệt"),
+            "KQ": st.column_config.TextColumn("KQ", width=120, help="Kết quả theo nguồn đã chọn"),
+            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=100, help="Kết quả Đặc Biệt"),
             "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width=100),
         }
         for f in range(16):
@@ -1053,6 +1058,5 @@ with tabs[5]:
             return styles
 
         st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=True)
-
 
 

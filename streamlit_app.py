@@ -302,7 +302,7 @@ with tabs[0]:
 # === TAB 2: DÀN NUÔI (SIMPLE VIEW) ===
 with tabs[1]:
     c1, c2, c3, c4 = st.columns([1, 1, 1.5, 1.5])
-    src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán", "Cả 2 (ĐT + TT)"])
+    src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán", "Cả 2 (ĐT + TT)"], index=1)
     comp_mode = c2.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
     check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
     backtest_mode = c4.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
@@ -869,7 +869,7 @@ with tabs[5]:
     st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
     
     # Thêm lựa chọn nguồn dữ liệu
-    freq_source = st.radio("Nguồn dữ liệu:", ["Cả 2 (ĐT + TT)", "Chỉ Điện Toán", "Chỉ Thần Tài"], horizontal=True, key="freq_source")
+    freq_source = st.radio("Nguồn dữ liệu:", ["Cả 2 (ĐT + TT)", "Chỉ Điện Toán", "Chỉ Thần Tài"], horizontal=True, key="freq_source", index=1)
     
     if len(dt_show) < 7:
         st.warning("Cần ít nhất 7 ngày dữ liệu để tính tần suất.")

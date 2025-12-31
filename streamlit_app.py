@@ -1,1062 +1,851 @@
+"""
+SIÊU GÀ APP - Streamlit Version
+Ứng dụng phân tích xổ số Miền Bắc
+Author: TRUNGND2025
+"""
+
 import streamlit as st
 import pandas as pd
-import logic
-import data_fetcher
-import concurrent.futures
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+from collections import Counter
+import re
+from io import StringIO
 
-# --- CẤU HÌNH ---
+# ============ CONFIG ============
 st.set_page_config(
-    page_title="SIÊU GÀ APP - PRO",
+    page_title="SIÊU GÀ APP",
     page_icon="🐔",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- CSS FIX LỖI FONT & GIAO DIỆN + RESPONSIVE ---
-st.markdown("""
-<style>
-    /* Fix lỗi font menu bị chìm trong dark mode */
-    .stTabs [data-baseweb="tab-list"] { gap: 4px; }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        background-color: #e0e0e0;
-        border-radius: 5px 5px 0 0;
-        padding: 10px;
-        color: #000000 !important; /* Ép màu chữ đen */
-        font-weight: 600;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #ff4b4b !important;
-        color: #ffffff !important;
-        border-top: 2px solid #ff4b4b;
-    }
-    /* Căn giữa ô bảng */
-    .stDataFrame td { vertical-align: middle !important; }
-    
-    /* === RESPONSIVE TABLE WRAPPER === */
-    .table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        margin: 10px 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    
-    /* === RESPONSIVE TABLE STYLES === */
-    .responsive-table {
-        border-collapse: collapse;
-        width: 100%;
-        font-size: 12px;
-        min-width: 600px; /* Minimum width để table không bị vỡ */
-    }
-    
-    .responsive-table th {
-        padding: 6px 4px;
-        border: 1px solid #34495e;
-        background-color: #2c3e50;
-        color: white;
-        text-align: center;
-        white-space: nowrap;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        font-size: 11px;
-    }
-    
-    .responsive-table td {
-        padding: 5px 3px;
-        border: 1px solid #dee2e6;
-        text-align: center;
-    }
-    
-    /* Sticky first 2 columns on desktop */
-    @media (min-width: 768px) {
-        .responsive-table th:nth-child(1),
-        .responsive-table td:nth-child(1) {
-            position: sticky;
-            left: 0;
-            z-index: 5;
-            background-color: #2c3e50;
-        }
-        
-        .responsive-table td:nth-child(1) {
-            background-color: inherit;
-            font-weight: bold;
-        }
-        
-        .responsive-table th:nth-child(2),
-        .responsive-table td:nth-child(2) {
-            position: sticky;
-            left: 80px;
-            z-index: 5;
-        }
-    }
-    
-    /* === MOBILE RESPONSIVE (< 768px) === */
-    @media (max-width: 767px) {
-        .responsive-table {
-            font-size: 11px;
-            min-width: 100%;
-        }
-        
-        .responsive-table th {
-            padding: 4px 3px;
-            font-size: 10px;
-        }
-        
-        .responsive-table td {
-            padding: 4px 2px;
-            font-size: 11px;
-        }
-        
-        /* Giảm width cho cột ngày và giải */
-        .responsive-table th:nth-child(1),
-        .responsive-table td:nth-child(1) {
-            min-width: 70px;
-            font-size: 10px;
-        }
-        
-        .responsive-table th:nth-child(2),
-        .responsive-table td:nth-child(2) {
-            min-width: 50px;
-        }
-        
-        .responsive-table th:nth-child(3),
-        .responsive-table td:nth-child(3) {
-            min-width: 120px;
-            font-size: 9px;
-        }
-        
-        .responsive-table th:nth-child(4),
-        .responsive-table td:nth-child(4) {
-            min-width: 40px;
-        }
-        
-        /* Cột N1, N2, N3... */
-        .responsive-table th:nth-child(n+5),
-        .responsive-table td:nth-child(n+5) {
-            min-width: 32px;
-            padding: 3px 2px;
-        }
-    }
-    
-    /* === EXTRA SMALL MOBILE (< 480px) === */
-    @media (max-width: 479px) {
-        .responsive-table {
-            font-size: 10px;
-        }
-        
-        .responsive-table th {
-            padding: 3px 2px;
-            font-size: 9px;
-        }
-        
-        .responsive-table td {
-            padding: 3px 1px;
-            font-size: 10px;
-        }
-        
-        .responsive-table th:nth-child(1),
-        .responsive-table td:nth-child(1) {
-            min-width: 60px;
-            font-size: 9px;
-        }
-        
-        .responsive-table th:nth-child(2),
-        .responsive-table td:nth-child(2) {
-            min-width: 45px;
-        }
-        
-        .responsive-table th:nth-child(3),
-        .responsive-table td:nth-child(3) {
-            min-width: 100px;
-            font-size: 8px;
-        }
-        
-        .responsive-table th:nth-child(n+5),
-        .responsive-table td:nth-child(n+5) {
-            min-width: 30px;
-            padding: 2px 1px;
-        }
-    }
-    
-    /* Scroll indicator hint */
-    .scroll-hint {
-        text-align: center;
-        color: #7f8c8d;
-        font-size: 12px;
-        margin-top: 5px;
-        display: none;
-    }
-    
-    @media (max-width: 767px) {
-        .scroll-hint {
-            display: block;
-        }
-    }
-</style>
-""", unsafe_allow_html=True)
+# ============ CONSTANTS ============
+TOTAL_DAYS = 100
+NUM_DAYS = 50
 
-# --- QUẢN LÝ DỮ LIỆU ---
-@st.cache_data(ttl=1800)
-def get_master_data(num_days):
-    # Tải song song tất cả các nguồn
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        f_dt = executor.submit(data_fetcher.fetch_dien_toan, num_days)
-        f_tt = executor.submit(data_fetcher.fetch_than_tai, num_days)
-        f_mb = executor.submit(data_fetcher.fetch_xsmb_group, num_days)
-        
-        dt = f_dt.result()
-        tt = f_tt.result()
-        mb_db, mb_g1 = f_mb.result()
+BO_DICT = {
+    "00": ["00","55","05","50"], "11": ["11","66","16","61"], "22": ["22","77","27","72"], 
+    "33": ["33","88","38","83"], "44": ["44","99","49","94"], 
+    "01": ["01","10","06","60","51","15","56","65"], "02": ["02","20","07","70","25","52","57","75"],
+    "03": ["03","30","08","80","35","53","58","85"], "04": ["04","40","09","90","45","54","59","95"], 
+    "12": ["12","21","17","71","26","62","67","76"], "13": ["13","31","18","81","36","63","68","86"], 
+    "14": ["14","41","19","91","46","64","69","96"], "23": ["23","32","28","82","73","37","78","87"],
+    "24": ["24","42","29","92","74","47","79","97"], "34": ["34","43","39","93","84","48","89","98"]
+}
 
-    # Xử lý khớp ngày (Quan trọng để không bị lệch)
-    df_dt = pd.DataFrame(dt)
-    df_tt = pd.DataFrame(tt)
+ZODIAC_DICT = {
+    "Tý": ["00","12","24","36","48","60","72","84","96"],
+    "Sửu": ["01","13","25","37","49","61","73","85","97"],
+    "Dần": ["02","14","26","38","50","62","74","86","98"],
+    "Mão": ["03","15","27","39","51","63","75","87","99"],
+    "Thìn": ["04","16","28","40","52","64","76","88"],
+    "Tỵ": ["05","17","29","41","53","65","77","89"],
+    "Ngọ": ["06","18","30","42","54","66","78","90"],
+    "Mùi": ["07","19","31","43","55","67","79","91"],
+    "Thân": ["08","20","32","44","56","68","80","92"],
+    "Dậu": ["09","21","33","45","57","69","81","93"],
+    "Tuất": ["10","22","34","46","58","70","82","94"],
+    "Hợi": ["11","23","35","47","59","71","83","95"]
+}
+
+HIEU_MAP = {
+    0: ["00","11","22","33","44","55","66","77","88","99"],
+    1: ["09","10","21","32","43","54","65","76","87","98"],
+    2: ["08","19","20","31","42","53","64","75","86","97"],
+    3: ["07","18","29","30","41","52","63","74","85","96"],
+    4: ["06","17","28","39","40","51","62","73","84","95"],
+    5: ["05","16","27","38","49","50","61","72","83","94"],
+    6: ["04","15","26","37","48","59","60","71","82","93"],
+    7: ["03","14","25","36","47","58","69","70","81","92"],
+    8: ["02","13","24","35","46","57","68","79","80","91"],
+    9: ["01","12","23","34","45","56","67","78","89","90"]
+}
+
+# ============ HELPER FUNCTIONS ============
+def bo(db: str) -> str:
+    """Lấy bộ số từ 2 chữ số cuối"""
+    db = db.zfill(2)
+    if db in BO_DICT:
+        return db
+    for key, vals in BO_DICT.items():
+        if db in vals:
+            return key
+    return "44"
+
+def get_bo_dan(bo_key):
+    return ",".join(BO_DICT.get(bo_key, []))
+
+def kep(db: str) -> str:
+    db = db.zfill(2)
+    if db in {"07","70","14","41","29","92","36","63","58","85"}:
+        return "K.ÂM"
+    elif db in {"00","55","11","66","22","77","33","88","44","99"}:
+        return "K.BẰNG"
+    elif db in {"05","50","16","61","27","72","38","83","49","94"}:
+        return "K.LỆCH"
+    elif db in {"01","10","12","21","23","32","34","43","45","54","56","65","67","76","78","87","89","98","09","90"}:
+        return "S.KÉP"
+    return "KHÔNG"
+
+def hieu(pair: str) -> int:
+    p = pair.zfill(2)
+    for delay, nums in HIEU_MAP.items():
+        if p in nums:
+            return delay
+    return -1
+
+def get_hieu_dan(h):
+    return ",".join(HIEU_MAP.get(int(h), []))
+
+def zodiac(pair: str) -> str:
+    p = pair.zfill(2)
+    for z, lst in ZODIAC_DICT.items():
+        if p in lst:
+            return z
+    return "Không xác định"
+
+def get_zodiac_dan(z):
+    return ",".join(ZODIAC_DICT.get(z, []))
+
+def get_tong_dan(tong):
+    d = []
+    for i in range(100):
+        num = f"{i:02d}"
+        if (int(num[0]) + int(num[1])) % 10 == int(tong):
+            d.append(num)
+    return ",".join(d)
+
+def jn(rng, rnd):
+    """Tính mức số - đếm số lần xuất hiện của mỗi cặp số"""
+    counts = {f"{i:02d}": 0 for i in range(100)}
+    for s in rng:
+        for pair in counts:
+            counts[pair] += s.count(pair)
+    return ",".join(pair for pair, cnt in counts.items() if cnt == rnd)
+
+def calculate_muc_so(dan_nuoi_list, compare_value=None):
+    all_numbers = []
+    for dan in dan_nuoi_list:
+        numbers = dan.split()
+        all_numbers.extend(numbers)
     
-    xsmb_rows = []
-    limit = min(len(dt), len(mb_db), len(mb_g1))
-    for i in range(limit):
-        xsmb_rows.append({
-            "date": dt[i]["date"], # Dùng ngày của Điện Toán làm chuẩn
-            "xsmb_full": mb_db[i],
-            "xsmb_2so": mb_db[i][-2:],
-            "g1_full": mb_g1[i],
-            "g1_2so": mb_g1[i][-2:]
-        })
-    df_xsmb = pd.DataFrame(xsmb_rows)
-
-    # Gộp thành bảng tổng (Master Table)
-    if not df_dt.empty and not df_xsmb.empty:
-        df = pd.merge(df_dt, df_tt, on="date", how="left")
-        df = pd.merge(df, df_xsmb, on="date", how="left")
-        return df
-    return pd.DataFrame()
-
-# --- SIDEBAR ---
-with st.sidebar:
-    st.title("🐔 SIÊU GÀ TOOL")
-    st.caption("Version: Matrix View")
-    days_fetch = st.number_input("Số ngày tải:", 30, 365, 60, step=10)
-    days_show = st.slider("Hiển thị:", 10, 100, 20)
-    if st.button("🔄 Tải lại dữ liệu", type="primary"):
-        st.cache_data.clear()
-        st.rerun()
-
-# --- LOAD DATA ---
-try:
-    with st.spinner("🚀 Đang tải dữ liệu đa luồng..."):
-        df_full = get_master_data(days_fetch)
-        if df_full.empty:
-            st.error("Không có dữ liệu. Kiểm tra kết nối mạng.")
-            st.stop()
-except Exception as e:
-    st.error(f"Lỗi: {e}")
-    st.stop()
-
-df_show = df_full.head(days_show).copy()
-
-# --- TABS ---
-tabs = st.tabs(["📊 KẾT QUẢ", "🎯 DÀN NUÔI (MATRIX)", "🎲 BỆT CẦU", "📊 THỐNG KÊ", "🔎 DÒ CẦU", "📈 TẦN SUẤT"])
-
-# --- DATA PREPARATION FOR NEW TABS ---
-def shorten_date(d):
-    # Loại bỏ phần thứ nếu có (ví dụ: "Thứ Tư ngày 26-11-2025" -> "26/11")
-    if "ngày" in d:
-        d = d.split("ngày")[-1].strip()  # Lấy phần sau "ngày"
-    # Chuyển từ dd-mm-yyyy hoặc dd/mm/yyyy sang dd/mm
-    d = d.replace("-", "/")
-    return "/".join(d.split("/")[:2])
-
-dt_show = []
-for _, row in df_show.iterrows():
-    dt_show.append({
-        'date': row['date'],
-        'numbers': row['dt_numbers'] if isinstance(row['dt_numbers'], list) else []
-    })
-
-full_xsmb = []
-full_g1 = []
-for _, row in df_full.iterrows():
-    full_xsmb.append({'date': row['date'], 'number': str(row['xsmb_full'])})
-    full_g1.append({'date': row['date'], 'number': str(row['g1_full'])})
-
-
-# === TAB 1: KẾT QUẢ ===
-with tabs[0]:
-    df_disp = df_show.copy()
-    df_disp['Điện Toán'] = df_disp['dt_numbers'].apply(lambda x: " - ".join(x) if isinstance(x, list) else "")
+    all_possible_pairs = [f"{i:02d}" for i in range(100)]
+    frequency = {pair: 0 for pair in all_possible_pairs}
+    for num in all_numbers:
+        frequency[num] = frequency.get(num, 0) + 1
     
-    st.dataframe(
-        df_disp[['date', 'Điện Toán', 'tt_number', 'xsmb_full', 'g1_full']],
-        column_config={
-            "date": st.column_config.TextColumn("Ngày", width="small"),
-            "Điện Toán": "Điện Toán 123",
-            "tt_number": "Thần Tài",
-            "xsmb_full": "Đặc Biệt",
-            "g1_full": "Giải Nhất"
-        },
-        hide_index=True, use_container_width=True
-    )
+    levels = {}
+    for num, freq in frequency.items():
+        if freq not in levels:
+            levels[freq] = []
+        levels[freq].append(num)
+    
+    result = {}
+    for level in sorted(levels.keys(), reverse=True):
+        pairs = sorted(levels[level], key=lambda x: int(x))
+        result[level] = pairs
+    return result
 
-# === TAB 2: DÀN NUÔI (SIMPLE VIEW) ===
-with tabs[1]:
-    c1, c2, c3, c4 = st.columns([1, 1, 1.5, 1.5])
-    src_mode = c1.selectbox("Nguồn:", ["Thần Tài", "Điện Toán", "Cả 2 (ĐT + TT)"], index=1)
-    comp_mode = c2.selectbox("So với:", ["XSMB (ĐB)", "Giải Nhất"])
-    check_range = c3.slider("Khung nuôi (ngày):", 1, 20, 7)
-    backtest_mode = c4.selectbox("Backtest:", ["Hiện tại", "Lùi 1 ngày", "Lùi 2 ngày", "Lùi 3 ngày", "Lùi 4 ngày", "Lùi 5 ngày"])
-    
-    # Tự động phân tích
-    backtest_offset = 0
-    if backtest_mode != "Hiện tại":
-        backtest_offset = int(backtest_mode.split()[1])
-    
-    if backtest_offset > 0:
-        st.info(f"🔍 Backtest: Từ {backtest_offset} ngày trước")
-    
-    col_comp = "xsmb_2so" if comp_mode == "XSMB (ĐB)" else "g1_2so"
-    
-    all_days_data = []
-    start_idx = backtest_offset
-    end_idx = min(backtest_offset + 20, len(df_full))  # Sử dụng df_full thay vì df_show
-    
-    for i in range(start_idx, end_idx):
-        row = df_full.iloc[i]
-        src_str = ""
-        if src_mode == "Thần Tài": 
-            src_str = str(row.get('tt_number', ''))
-        elif src_mode == "Điện Toán": 
-            src_str = "".join(row.get('dt_numbers', []))
-        elif src_mode == "Cả 2 (ĐT + TT)":
-            dt_val = "".join(row.get('dt_numbers', []))
-            tt_val = str(row.get('tt_number', ''))
-            if tt_val == 'nan': tt_val = ""
-            src_str = dt_val + tt_val
+# ============ DATA FETCHING ============
+@st.cache_data(ttl=3600)  # Cache 1 hour
+def fetch_dien_toan_data():
+    """Lấy dữ liệu Điện Toán 123"""
+    try:
+        url = f"https://ketqua04.net/so-ket-qua-dien-toan-123/{TOTAL_DAYS}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        divs = soup.find_all("div", class_="result_div", id="result_123")
+        data = []
+        for div in divs[:TOTAL_DAYS]:
+            ds = div.find("span", id="result_date")
+            date = ds.text.strip() if ds else ""
+            tbl = div.find("table", id="result_tab_123")
+            row = tbl.find("tbody").find("tr") if tbl else None
+            cells = row.find_all("td") if row else []
+            if len(cells) == 3 and all(c.text.strip().isdigit() for c in cells):
+                nums = [c.text.strip() for c in cells]
+                data.append({"date": date, "numbers": nums})
+        return data
+    except Exception as e:
+        st.error(f"Lỗi lấy dữ liệu Điện Toán: {e}")
+        return []
+
+@st.cache_data(ttl=3600)
+def fetch_than_tai_data():
+    """Lấy dữ liệu Thần Tài"""
+    try:
+        url = f"https://ketqua04.net/so-ket-qua-than-tai/{TOTAL_DAYS}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        divs = soup.find_all("div", class_="result_div", id="result_tt4")
+        data = []
+        for div in divs[:TOTAL_DAYS]:
+            ds = div.find("span", id="result_date")
+            date = ds.text.strip() if ds else ""
+            tbl = div.find("table", id="result_tab_tt4")
+            cell = tbl.find("td", id="rs_0_0") if tbl else None
+            num = cell.text.strip() if cell else ""
+            if num.isdigit() and len(num) == 4:
+                data.append({"date": date, "number": num})
+        return data
+    except Exception as e:
+        st.error(f"Lỗi lấy dữ liệu Thần Tài: {e}")
+        return []
+
+@st.cache_data(ttl=3600)
+def fetch_xsmb_data():
+    """Lấy dữ liệu XSMB (Giải Đặc Biệt)"""
+    try:
+        url = "https://congcuxoso.com/MienBac/DacBiet/PhoiCauDacBiet/PhoiCauTuan5So.aspx"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        tbl = soup.find("table", id="MainContent_dgv")
+        if not tbl:
+            return []
+        rows = tbl.find_all("tr")[1:]
+        nums = []
+        for row in reversed(rows):
+            for cell in reversed(row.find_all("td")):
+                t = cell.text.strip()
+                if t and t not in ("-----", "\xa0"):
+                    nums.append(t.zfill(5))
         
-        if not src_str or src_str == "nan": 
-            continue
-        
-        digits = set(src_str)
-        combos = sorted({a+b for a in digits for b in digits})
-        all_days_data.append({'date': row['date'], 'source': src_str, 'combos': combos, 'index': i})
-    
-    if not all_days_data:
-        st.warning("⚠️ Không có dữ liệu")
-    else:
-        st.markdown("### 📋 Bảng Theo Dõi")
-        
-        # Wrapper div cho responsive
-        table_html = "<div class='table-wrapper'>"
-        table_html += "<table class='responsive-table'><tr>"
-        table_html += "<th>Ngày</th>"
-        table_html += "<th>Giải</th>"
-        table_html += "<th>Dàn nhị hợp</th>"
-        table_html += "<th>Mức</th>"
-        
-        num_days = len(all_days_data)
-        for k in range(1, num_days + 1):
-            table_html += f"<th>N{k}</th>"
-        table_html += "</tr>"
-        
-        for row_idx, day_data in enumerate(all_days_data):
-            date, source, combos, i = day_data['date'], day_data['source'], day_data['combos'], day_data['index']
-            dan_str = " ".join(combos[:15]) + ("..." if len(combos) > 15 else "")
-            row_bg = "#f8f9fa" if row_idx % 2 == 0 else "#ffffff"
-            table_html += f"<tr style='background-color: {row_bg};'><td style='font-weight: bold; color: #2c3e50;'>{date}</td>"
-            table_html += f"<td style='color: #495057;'>{source}</td>"
-            table_html += f"<td style='font-size: 11px; color: #495057;'>{dan_str}</td>"
-            table_html += f"<td style='font-weight: 600; color: #2c3e50;'>{len(combos)}</td>"
-            
-            num_cols_this_row = row_idx + 1
-            for k in range(1, num_cols_this_row + 1):
-                idx = i - k
-                cell_val, bg_color, text_color = "", "#ecf0f1", "#7f8c8d"
-                
-                # Chỉ hiển thị kết quả nếu idx >= backtest_offset (không xem "tương lai")
-                if idx >= 0 and idx >= backtest_offset:
-                    val_res = df_full.iloc[idx][col_comp]
-                    if val_res in combos:
-                        cell_val, bg_color, text_color = "✅", "#27ae60", "white"
-                    else:
-                        cell_val, bg_color, text_color = "--", "#e74c3c", "white"
-                table_html += f"<td style='background-color: {bg_color}; color: {text_color}; font-weight: bold;'>{cell_val}</td>"
-            
-            for _ in range(num_days - row_idx - 1):
-                table_html += "<td style='background-color: #ecf0f1;'></td>"
-            table_html += "</tr>"
-        
-        table_html += "</table></div>"
-        table_html += "<div class='scroll-hint'>👆 Vuốt ngang để xem thêm →</div>"
-        st.markdown(table_html, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.subheader("📊 Thống kê")
-        total_days, total_checks, total_hits = len(all_days_data), 0, 0
-        for row_idx, day_data in enumerate(all_days_data):
-            combos, i = day_data['combos'], day_data['index']
-            for k in range(1, row_idx + 2):
-                idx = i - k
-                # Chỉ tính nếu idx >= backtest_offset (không tính "tương lai")
-                if idx >= 0 and idx >= backtest_offset:
-                    total_checks += 1
-                    if df_full.iloc[idx][col_comp] in combos:
-                        total_hits += 1
-        
-        hit_rate = round(total_hits / total_checks * 100, 1) if total_checks > 0 else 0
-        col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-        col_s1.metric("Tổng ngày", total_days)
-        col_s2.metric("Tổng kiểm tra", total_checks)
-        col_s3.metric("Đã trúng", total_hits)
-        col_s4.metric("Tỷ lệ", f"{hit_rate}%")
-        
-        # === TỔNG HỢP DÀN CHƯA RA ===
-        st.markdown("---")
-        st.subheader("🎯 Tổng hợp Dàn Chưa Ra")
-        st.caption("Các dàn nhị hợp chưa ra (chưa trúng số nào)")
-        
-        # Thu thập dữ liệu theo ngày - chỉ những dàn HOÀN TOÀN chưa ra
-        from datetime import datetime
-        pending_by_date = []
-        
-        for row_idx, day_data in enumerate(all_days_data):
-            combos = day_data['combos']
-            date = day_data['date']
-            i = day_data['index']
-            num_cols_this_row = row_idx + 1
-            hit_numbers = set()
-            
-            # Kiểm tra xem có số nào trong dàn đã trúng chưa (chỉ xét dữ liệu lịch sử)
-            for k in range(1, num_cols_this_row + 1):
-                idx = i - k
-                if idx >= 0 and idx >= backtest_offset:
-                    val_res = df_full.iloc[idx][col_comp]
-                    if val_res in combos:
-                        hit_numbers.add(val_res)
-            
-            # Nếu CHƯA có số nào trúng (hit_numbers rỗng) thì dàn này chưa ra
-            if not hit_numbers:
-                # Parse date để lấy thứ
-                try:
-                    date_obj = datetime.strptime(date, "%d/%m/%Y")
-                    weekday_names = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"]
-                    weekday = weekday_names[date_obj.weekday()]
-                except:
-                    weekday = ""
-                
-                pending_by_date.append({
-                    'Ngày': f"{weekday} {date}" if weekday else date,
-                    'Dàn nhị hợp': ', '.join(sorted(combos)),
-                    'Số lượng': len(combos),
-                    'combos': combos  # Giữ lại để phân tích tần suất
-                })
-        
-        if pending_by_date:
-            # Hiển thị bảng theo ngày
-            df_display = pd.DataFrame([{k: v for k, v in item.items() if k != 'combos'} for item in pending_by_date])
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
-            
-            # Phân tích tần suất các số trong các dàn chưa ra
-            st.markdown("---")
-            st.markdown("**📊 Mức số trong các dàn chưa ra:**")
-            st.caption("Đếm số lần xuất hiện của mỗi số trong tất cả các dàn chưa ra")
-            
-            # Đếm tần suất
-            from collections import defaultdict
-            number_frequency = defaultdict(int)
-            for item in pending_by_date:
-                for num in item['combos']:
-                    number_frequency[num] += 1
-            
-            # Nhóm theo mức (bao gồm mức 0)
-            level_groups = defaultdict(list)
-            for num, freq in number_frequency.items():
-                level_groups[freq].append(num)
-            
-            # Tìm tất cả số từ 00-99 và thêm mức 0
-            all_possible_numbers = {f"{i:02d}" for i in range(100)}
-            numbers_in_pending = set(number_frequency.keys())
-            level_0_numbers = sorted(all_possible_numbers - numbers_in_pending)
-            
-            if level_0_numbers:
-                level_groups[0] = level_0_numbers
-            
-            # Hiển thị theo mức giảm dần
-            for freq in sorted(level_groups.keys(), reverse=True):
-                nums = sorted(level_groups[freq])
-                st.write(f"**Mức {freq}** ({len(nums)} số): {', '.join(nums)}")
-            
-            # Thống kê tổng quan
-            st.markdown("---")
-            total_days_pending = len(pending_by_date)
-            total_unique_numbers = len(number_frequency)
-            col_p1, col_p2 = st.columns(2)
-            col_p1.metric("Số ngày có dàn chưa ra", total_days_pending)
-            col_p2.metric("Tổng số unique trong các dàn", total_unique_numbers)
+        dien_toan = fetch_dien_toan_data()
+        data = []
+        if dien_toan:
+            N = min(len(nums), len(dien_toan), TOTAL_DAYS)
+            for i in range(N):
+                data.append({"date": dien_toan[i]["date"], "number": nums[i]})
         else:
-            st.success("✅ Tất cả các dàn đều đã ra (có ít nhất 1 số trúng)!")
+            current_date = datetime.now()
+            for i, num in enumerate(nums[:TOTAL_DAYS]):
+                date_str = (current_date - timedelta(days=i)).strftime("Ngày %d/%m/%Y")
+                data.append({"date": date_str, "number": num})
+        return data
+    except Exception as e:
+        st.error(f"Lỗi lấy dữ liệu XSMB: {e}")
+        return []
+
+@st.cache_data(ttl=3600)
+def fetch_giai_nhat_data():
+    """Lấy dữ liệu Giải Nhất"""
+    try:
+        url = "https://congcuxoso.com/MienBac/GiaiNhat/PhoiCauGiaiNhat/PhoiCauTuan5So.aspx"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        tbl = soup.find("table", id="MainContent_dgv")
+        if not tbl:
+            return []
+        rows = tbl.find_all("tr")[1:]
+        nums = []
+        for row in reversed(rows):
+            for cell in reversed(row.find_all("td")):
+                t = cell.text.strip()
+                if t and t not in ("-----", "\xa0"):
+                    nums.append(t.zfill(5))
         
-        # === PHÂN TÍCH CHU KỲ & NHẬN ĐỊNH ===
-        st.markdown("---")
-        st.subheader("🔮 Phân tích Chu kỳ & Nhận định")
-        st.caption("Dựa trên dữ liệu bảng theo dõi")
+        dien_toan = fetch_dien_toan_data()
+        data = []
+        if dien_toan:
+            N = min(len(nums), len(dien_toan), TOTAL_DAYS)
+            for i in range(N):
+                data.append({"date": dien_toan[i]["date"], "number": nums[i]})
+        else:
+            current_date = datetime.now()
+            for i, num in enumerate(nums[:TOTAL_DAYS]):
+                date_str = (current_date - timedelta(days=i)).strftime("Ngày %d/%m/%Y")
+                data.append({"date": date_str, "number": num})
+        return data
+    except Exception as e:
+        st.error(f"Lỗi lấy dữ liệu Giải Nhất: {e}")
+        return []
+
+# ============ SIDEBAR ============
+st.sidebar.title("🐔 SIÊU GÀ APP")
+st.sidebar.markdown("---")
+
+# Display mode selection
+display_options = ["Hiện tại"] + [f"Lùi {i}" for i in range(1, 10)]
+display_mode = st.sidebar.selectbox("📅 Chế độ hiển thị", display_options)
+
+# Compare source selection
+compare_source = st.sidebar.radio("📊 Nguồn so sánh", ["GĐB", "Giải Nhất"])
+
+# Result type selection
+result_type = st.sidebar.radio("🎯 Loại kết quả", ["Thần tài", "Điện toán"])
+
+st.sidebar.markdown("---")
+include_duplicates = st.sidebar.checkbox("Bao gồm số trùng", value=True)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("© TRUNGND2025")
+
+# ============ MAIN CONTENT ============
+st.title("🐔 SIÊU GÀ APP")
+st.caption("Ứng dụng phân tích xổ số Miền Bắc")
+
+# Load data
+with st.spinner("Đang tải dữ liệu..."):
+    dien_toan_data = fetch_dien_toan_data()
+    than_tai_data = fetch_than_tai_data()
+    xsmb_data = fetch_xsmb_data()
+    giai_nhat_data = fetch_giai_nhat_data()
+
+# Calculate offset
+offset = 0 if display_mode == "Hiện tại" else int(display_mode.split()[-1])
+
+# Tabs
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📋 Kết Quả XS", 
+    "🎲 Dàn Nuôi", 
+    "📈 Mức Số",
+    "📊 Thống Kê ĐB/G1",
+    "ℹ️ Hướng Dẫn"
+])
+
+# ============ TAB 1: KẾT QUẢ XỔ SỐ ============
+with tab1:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🎰 Điện Toán 123")
+        if dien_toan_data:
+            dt_slice = dien_toan_data[offset:offset + NUM_DAYS]
+            df_dt = pd.DataFrame([
+                {"Ngày": d["date"], "Số 1": d["numbers"][0], "Số 2": d["numbers"][1], "Số 3": d["numbers"][2]}
+                for d in dt_slice
+            ])
+            st.dataframe(df_dt, use_container_width=True, height=400)
         
-        # Thu thập dữ liệu chu kỳ cho mỗi dàn
-        cycle_analysis = []
+        st.subheader("🌟 Thần Tài")
+        if than_tai_data:
+            tt_slice = than_tai_data[offset:offset + NUM_DAYS]
+            df_tt = pd.DataFrame([{"Ngày": d["date"], "Số": d["number"]} for d in tt_slice])
+            st.dataframe(df_tt, use_container_width=True, height=400)
+    
+    with col2:
+        st.subheader("🏆 Giải Đặc Biệt")
+        if xsmb_data:
+            xsmb_slice = xsmb_data[offset:offset + NUM_DAYS]
+            df_xsmb = pd.DataFrame([{"Ngày": d["date"], "Số": d["number"]} for d in xsmb_slice])
+            st.dataframe(df_xsmb, use_container_width=True, height=400)
         
-        for row_idx, day_data in enumerate(all_days_data):
-            combos = day_data['combos']
-            date = day_data['date']
-            i = day_data['index']
+        st.subheader("🥇 Giải Nhất")
+        if giai_nhat_data:
+            g1_slice = giai_nhat_data[offset:offset + NUM_DAYS]
+            df_g1 = pd.DataFrame([{"Ngày": d["date"], "Số": d["number"]} for d in g1_slice])
+            st.dataframe(df_g1, use_container_width=True, height=400)
+
+# ============ TAB 2: DÀN NUÔI ============
+with tab2:
+    st.subheader("🎲 Dàn Nuôi ĐT+TT")
+    
+    if dien_toan_data and than_tai_data and xsmb_data:
+        dt_slice = dien_toan_data[offset:offset + NUM_DAYS]
+        tt_slice = than_tai_data[offset:offset + NUM_DAYS]
+        xsmb_slice = xsmb_data[offset:offset + NUM_DAYS]
+        g1_slice = giai_nhat_data[offset:offset + NUM_DAYS] if giai_nhat_data else []
+        
+        # Get results based on type
+        if result_type == "Thần tài":
+            results = [item["number"] for item in tt_slice]
+        else:
+            results = ["".join(item["numbers"]) for item in dt_slice]
+        
+        # Calculate Dàn Nuôi
+        dan_nuoi_rows = []
+        chua_ra_list = []
+        
+        for i in range(min(len(results), NUM_DAYS)):
+            val = results[i]
+            digits = list(val)
             
-            # Phân tích dữ liệu từ bảng theo dõi
-            num_cols_this_row = row_idx + 1
-            hits = []  # Vị trí các lần trúng (1, 2, 3...)
-            misses = []  # Vị trí các lần không trúng
+            # Nhị hợp
+            combos = set()
+            for a in digits:
+                for b in digits:
+                    pair = a + b
+                    if include_duplicates or a != b:
+                        combos.add(pair)
             
-            for k in range(1, num_cols_this_row + 1):
-                idx = i - k
-                if idx >= 0 and idx >= backtest_offset:
-                    val_res = df_full.iloc[idx][col_comp]
-                    if val_res in combos:
-                        hits.append(k)
-                    else:
-                        misses.append(k)
-            
-            # Tính toán chu kỳ và nhận định
-            total_checks = len(hits) + len(misses)
-            hit_count = len(hits)
-            miss_count = len(misses)
-            
-            if total_checks == 0:
-                status = "🆕 Mới tạo - Chưa có dữ liệu"
-                avg_cycle_display = "N/A"
-                last_hit_display = "N/A"
-                priority = 2
-                overdue = 0
-            elif hit_count == 0:
-                # Chưa ra lần nào
-                status = f"🔥 Chưa ra ({total_checks} ngày kiểm tra) - Ưu tiên cao"
-                avg_cycle_display = "Chưa ra"
-                last_hit_display = "Chưa bao giờ"
-                priority = 0
-                overdue = total_checks
+            # Comparison values
+            if compare_source == "GĐB":
+                C = [(xsmb_slice[i-k]["number"][-2:] if i >= k and i-k < len(xsmb_slice) else "") for k in range(1, 22)]
             else:
-                # Đã ra ít nhất 1 lần
-                # Tính chu kỳ giữa các lần trúng
-                if len(hits) > 1:
-                    cycles = [hits[j-1] - hits[j] for j in range(1, len(hits))]
-                    avg_cycle = round(sum(cycles) / len(cycles), 1)
-                else:
-                    avg_cycle = hits[0]
-                
-                avg_cycle_display = f"{avg_cycle} ngày"
-                last_hit_display = f"N{hits[0]}"
-                
-                # Nhận định dựa trên chu kỳ
-                days_since_last = hits[0] - 1  # Số ngày từ lần trúng cuối
-                
-                if days_since_last == 0:
-                    status = "✅ Vừa trúng hôm qua"
-                    priority = 2
-                    overdue = 0
-                elif days_since_last < avg_cycle:
-                    remaining = round(avg_cycle - days_since_last)
-                    status = f"⏳ Trong chu kỳ (còn ~{remaining} ngày)"
-                    priority = 2
-                    overdue = 0
-                else:
-                    overdue_days = days_since_last - avg_cycle
-                    if overdue_days > avg_cycle * 0.5:
-                        status = f"⚠️ Quá chu kỳ {round(overdue_days)} ngày - Ưu tiên cao"
-                        priority = 1
-                        overdue = overdue_days
-                    else:
-                        status = f"📍 Quá chu kỳ {round(overdue_days)} ngày"
-                        priority = 1
-                        overdue = overdue_days
+                C = [(g1_slice[i-k]["number"][-2:] if i >= k and i-k < len(g1_slice) else "") for k in range(1, 22)]
             
-            cycle_analysis.append({
-                'Ngày': date,
-                'Dàn': ', '.join(sorted(combos)),
-                'Chu kỳ TB': avg_cycle_display,
-                'Lần cuối ra': last_hit_display,
-                'Đã kiểm tra': total_checks,
-                'Trúng/Trượt': f"{hit_count}/{miss_count}",
-                'Nhận định': status,
-                # Thêm các trường ẩn để sắp xếp
-                '_sort_priority': priority,
-                '_overdue_days': overdue,
-                '_total_checks': total_checks
+            K = [c if c in combos else "" for c in C]
+            missing = [c for c in combos if c not in C]
+            
+            hit = "✅" if any(K) else "❌"
+            
+            if i <= 28 and all(x == "" for x in K):
+                chua_ra_list.append(" ".join(sorted(combos)))
+            
+            dan_nuoi_rows.append({
+                "Ngày": dt_slice[i]["date"] if i < len(dt_slice) else "",
+                "KQ": val,
+                "Dàn Nuôi": " ".join(sorted(combos)),
+                "Hit": hit,
+                "K1-K5": " | ".join(K[:5]),
             })
         
-        if cycle_analysis:
-            # Sắp xếp: Ưu tiên chưa ra (nhiều ngày nhất), sau đó quá chu kỳ nhiều nhất, sau đó trong chu kỳ
-            cycle_analysis.sort(key=lambda x: (x['_sort_priority'], -x['_overdue_days'], -x['_total_checks']))
+        df_dan = pd.DataFrame(dan_nuoi_rows)
+        st.dataframe(df_dan, use_container_width=True, height=500)
+        
+        # Mức Số từ dàn chưa ra
+        if chua_ra_list:
+            st.subheader("📊 Mức Số từ Dàn Chưa Ra")
+            muc_so = calculate_muc_so(chua_ra_list)
+            for level, pairs in list(muc_so.items())[:10]:  # Top 10 levels
+                if pairs:
+                    st.markdown(f"**Mức {level}**: {len(pairs)} số ({', '.join(pairs[:20])}{'...' if len(pairs) > 20 else ''})")
+
+# ============ TAB 3: MỨC SỐ ============
+with tab3:
+    st.subheader("📈 Lên Dàn Số Nuôi")
+    
+    # Helper function tính toán dàn lâu ra
+    def calculate_lau_ra(results, xsmb_slice, g1_slice, compare_source, empty_threshold, dt_slice):
+        n = len(results)
+        lau_ra_list = []
+        
+        for i in range(min(NUM_DAYS, n)):
+            start = i if i <= n - 7 else max(0, n - 7)
+            window = results[start:start + 7]
             
-            # Loại bỏ các trường ẩn trước khi hiển thị
-            cycle_analysis_display = [{k: v for k, v in item.items() if not k.startswith('_')} for item in cycle_analysis]
+            M_values = [jn(window, k) for k in range(1, 8)]
+            pairs = []
+            for m in M_values:
+                if m:
+                    pairs.extend(m.split(","))
+            pairs_sorted = sorted(set(pairs), key=lambda x: int(x))
+            dan_nuoi = " ".join(pairs_sorted)
             
-            df_cycle = pd.DataFrame(cycle_analysis_display)
-            st.dataframe(df_cycle, use_container_width=True, hide_index=True)
-            
-            # Gợi ý ưu tiên
-            st.markdown("---")
-            st.markdown("**💡 Gợi ý ưu tiên theo dõi:**")
-            
-            # Lọc các dàn ưu tiên cao
-            priority_sets = [item for item in cycle_analysis if "Ưu tiên cao" in item['Nhận định'] or "Chưa ra lần nào" in item['Nhận định']]
-            
-            if priority_sets:
-                st.info(f"Có **{len(priority_sets)}** dàn cần ưu tiên theo dõi (quá hạn hoặc chưa ra lần nào)")
-                
-                # Hiển thị danh sách dàn ưu tiên
-                st.markdown("**📋 Danh sách dàn ưu tiên:**")
-                for idx, item in enumerate(priority_sets, 1):
-                    st.write(f"{idx}. **{item['Ngày']}**: {item['Dàn']} - _{item['Nhận định']}_")
-                
-                # Phân tích mức số trong các dàn ưu tiên
-                st.markdown("---")
-                st.markdown("**📊 Mức số trong các dàn ưu tiên:**")
-                
-                from collections import defaultdict
-                priority_number_freq = defaultdict(int)
-                
-                # Đếm tần suất từ dàn gốc (không phải string đã format)
-                for row_idx, day_data in enumerate(all_days_data):
-                    date = day_data['date']
-                    combos = day_data['combos']
-                    
-                    # Kiểm tra xem dàn này có trong danh sách ưu tiên không
-                    is_priority = any(p['Ngày'] == date for p in priority_sets)
-                    
-                    if is_priority:
-                        for num in combos:
-                            priority_number_freq[num] += 1
-                
-                # Nhóm theo mức (bao gồm mức 0)
-                level_groups_priority = defaultdict(list)
-                for num, freq in priority_number_freq.items():
-                    level_groups_priority[freq].append(num)
-                
-                # Tìm tất cả số từ 00-99 và thêm mức 0
-                all_possible_numbers = {f"{i:02d}" for i in range(100)}
-                numbers_in_priority = set(priority_number_freq.keys())
-                level_0_numbers = sorted(all_possible_numbers - numbers_in_priority)
-                
-                if level_0_numbers:
-                    level_groups_priority[0] = level_0_numbers
-                
-                # Hiển thị theo mức giảm dần
-                for freq in sorted(level_groups_priority.keys(), reverse=True):
-                    nums = sorted(level_groups_priority[freq])
-                    st.write(f"**Mức {freq}** ({len(nums)} số): {', '.join(nums)}")
+            if compare_source == "GĐB":
+                C = [(xsmb_slice[i-k]["number"][-2:] if i >= k and i-k < len(xsmb_slice) else "") for k in range(1, 29)]
             else:
-                st.success("Tất cả các dàn đang trong chu kỳ bình thường")
+                C = [(g1_slice[i-k]["number"][-2:] if i >= k and i-k < len(g1_slice) else "") for k in range(1, 29)]
+            
+            K = [c if c in pairs_sorted else "" for c in C]
+            
+            last_k_index = -1
+            valid_k_range = min(i + 1, len(K))
+            for j in range(valid_k_range - 1, -1, -1):
+                if K[j] != "":
+                    last_k_index = j
+                    break
+            empty_count = valid_k_range if last_k_index == -1 else max(0, (valid_k_range - 1 - last_k_index) - 1)
+            
+            if empty_count >= empty_threshold and i <= 28 and dan_nuoi:
+                lau_ra_list.append((results[i], dan_nuoi))
+        
+        return lau_ra_list
+    
+    # Auto-reduce threshold function
+    def get_lau_ra_with_auto_reduce(results, xsmb_slice, g1_slice, compare_source, initial_threshold, dt_slice):
+        threshold = initial_threshold
+        lau_ra = calculate_lau_ra(results, xsmb_slice, g1_slice, compare_source, threshold, dt_slice)
+        actual_threshold = threshold
+        
+        # Tự động giảm threshold nếu không có dàn lâu ra
+        while not lau_ra and threshold > 1:
+            threshold -= 1
+            lau_ra = calculate_lau_ra(results, xsmb_slice, g1_slice, compare_source, threshold, dt_slice)
+            actual_threshold = threshold
+        
+        return lau_ra, actual_threshold
+    
+    # Controls row
+    ctrl_col1, ctrl_col2 = st.columns(2)
+    with ctrl_col1:
+        empty_tt = st.slider("Ô rỗng TT ≥", 1, 10, 4, key="empty_tt")
+    with ctrl_col2:
+        empty_dt = st.slider("Ô rỗng ĐT ≥", 1, 10, 4, key="empty_dt")
+    
+    if dien_toan_data and than_tai_data and xsmb_data:
+        dt_slice = dien_toan_data[offset:offset + NUM_DAYS]
+        tt_slice = than_tai_data[offset:offset + NUM_DAYS]
+        xsmb_slice = xsmb_data[offset:offset + NUM_DAYS]
+        g1_slice = giai_nhat_data[offset:offset + NUM_DAYS] if giai_nhat_data else []
+        
+        # Tính dàn lâu ra cho cả 2 loại với auto-reduce
+        results_tt = [item["number"] for item in tt_slice]
+        results_dt = ["".join(item["numbers"]) for item in dt_slice]
+        
+        lau_ra_tt, actual_tt = get_lau_ra_with_auto_reduce(results_tt, xsmb_slice, g1_slice, compare_source, empty_tt, dt_slice)
+        lau_ra_dt, actual_dt = get_lau_ra_with_auto_reduce(results_dt, xsmb_slice, g1_slice, compare_source, empty_dt, dt_slice)
+        
+        # ============ 2 CỘT: THẦN TÀI | ĐIỆN TOÁN ============
+        col_tt, col_dt = st.columns(2)
+        
+        # Variables để lưu mức số cho backtest
+        muc_tt_results = []
+        muc_dt_results = []
+        
+        # ===== CỘT THẦN TÀI =====
+        with col_tt:
+            st.markdown("### 🌟 Thần Tài")
+            if actual_tt != empty_tt:
+                st.warning(f"⚠️ Auto-giảm xuống {actual_tt} ô rỗng")
+            
+            if lau_ra_tt:
+                all_dan_tt = "\n".join([dan for _, dan in lau_ra_tt])
+                st.text_area("Dàn Lâu Ra TT:", all_dan_tt, height=120, key="dan_tt")
+                
+                dan_list_tt = [dan for _, dan in lau_ra_tt]
+                n_dan_tt = len(dan_list_tt)
+                
+                st.markdown("#### Chọn mức TT để lên dàn")
+                for level in range(n_dan_tt + 1):
+                    pairs = jn(dan_list_tt, level)
+                    if pairs:
+                        pairs_list = pairs.split(",")
+                        muc_tt_results.append({
+                            "level": level,
+                            "count": len(pairs_list),
+                            "pairs": pairs,
+                            "pairs_set": set(pairs_list)
+                        })
+                
+                # Checkbox cho mỗi mức với hiển thị đầy đủ số
+                selected_tt = []
+                for muc in muc_tt_results:
+                    col_cb, col_num = st.columns([1, 3])
+                    with col_cb:
+                        checked = st.checkbox(
+                            f"Mức {muc['level']}: {muc['count']} số", 
+                            value=(muc['level'] <= 2),
+                            key=f"cb_tt_{muc['level']}"
+                        )
+                    with col_num:
+                        st.caption(muc['pairs'])
+                    if checked:
+                        selected_tt.extend(muc['pairs'].split(","))
+                
+                # Tổng hợp các mức đã chọn
+                if selected_tt:
+                    unique_tt = sorted(set(selected_tt), key=lambda x: int(x))
+                    st.markdown(f"**Dàn TT đã chọn: {len(unique_tt)} số**")
+                    st.code(",".join(unique_tt), language=None)
+            else:
+                selected_tt = []
+                st.info("Không có dàn lâu ra")
+        
+        # ===== CỘT ĐIỆN TOÁN =====
+        with col_dt:
+            st.markdown("### 🎰 Điện Toán")
+            if actual_dt != empty_dt:
+                st.warning(f"⚠️ Auto-giảm xuống {actual_dt} ô rỗng")
+            
+            if lau_ra_dt:
+                all_dan_dt = "\n".join([dan for _, dan in lau_ra_dt])
+                st.text_area("Dàn Lâu Ra ĐT:", all_dan_dt, height=120, key="dan_dt")
+                
+                dan_list_dt = [dan for _, dan in lau_ra_dt]
+                n_dan_dt = len(dan_list_dt)
+                
+                st.markdown("#### Chọn mức ĐT để lên dàn")
+                for level in range(n_dan_dt + 1):
+                    pairs = jn(dan_list_dt, level)
+                    if pairs:
+                        pairs_list = pairs.split(",")
+                        muc_dt_results.append({
+                            "level": level,
+                            "count": len(pairs_list),
+                            "pairs": pairs,
+                            "pairs_set": set(pairs_list)
+                        })
+                
+                # Checkbox cho mỗi mức với hiển thị đầy đủ số
+                selected_dt = []
+                for muc in muc_dt_results:
+                    col_cb, col_num = st.columns([1, 3])
+                    with col_cb:
+                        checked = st.checkbox(
+                            f"Mức {muc['level']}: {muc['count']} số", 
+                            value=(muc['level'] <= 2),
+                            key=f"cb_dt_{muc['level']}"
+                        )
+                    with col_num:
+                        st.caption(muc['pairs'])
+                    if checked:
+                        selected_dt.extend(muc['pairs'].split(","))
+                
+                # Tổng hợp các mức đã chọn
+                if selected_dt:
+                    unique_dt = sorted(set(selected_dt), key=lambda x: int(x))
+                    st.markdown(f"**Dàn ĐT đã chọn: {len(unique_dt)} số**")
+                    st.code(",".join(unique_dt), language=None)
+            else:
+                selected_dt = []
+                st.info("Không có dàn lâu ra")
+        
+        # ============ TỔNG HỢP TT + ĐT ============
+        st.markdown("---")
+        st.subheader("🎯 Tổng Hợp TT + ĐT")
+        
+        # Gộp các số đã chọn từ cả 2 nguồn
+        all_selected = []
+        if 'selected_tt' in dir() and selected_tt:
+            all_selected.extend(selected_tt)
+        if 'selected_dt' in dir() and selected_dt:
+            all_selected.extend(selected_dt)
+        
+        if all_selected:
+            from collections import Counter
+            freq = Counter(all_selected)
+            
+            # Nhóm theo tần suất (mức)
+            freq_groups = {}
+            for num, count in freq.items():
+                if count not in freq_groups:
+                    freq_groups[count] = []
+                freq_groups[count].append(num)
+            
+            # Tính Mức 0 - các số không xuất hiện trong dàn đã chọn
+            all_nums = set(f"{i:02d}" for i in range(100))
+            selected_set = set(all_selected)
+            muc_0 = sorted(all_nums - selected_set, key=lambda x: int(x))
+            
+            # Hiển thị từng mức với code block để copy
+            for level in sorted(freq_groups.keys(), reverse=True):
+                nums = sorted(freq_groups[level], key=lambda x: int(x))
+                st.markdown(f"**Mức {level}: {len(nums)} số**")
+                st.code(",".join(nums), language=None)
+            
+            # Hiển thị Mức 0
+            if muc_0:
+                st.markdown(f"**Mức 0: {len(muc_0)} số** (không xuất hiện)")
+                st.code(",".join(muc_0), language=None)
         else:
-            pass  # Không có dữ liệu để phân tích chu kỳ
-
-
-with tabs[2]:
-    st.subheader("Soi Cầu Bệt (GĐB/G1)")
-    # Logic soi cầu bệt đơn giản
-    bet_data = []
-    for i in range(len(df_show) - 1):
-        curr = df_show.iloc[i]['xsmb_full']
-        prev = df_show.iloc[i+1]['xsmb_full']
-        if not curr or not prev: continue
+            st.info("Chưa chọn mức nào từ TT hoặc ĐT")
         
-        # Tìm bệt thẳng
-        d1, d2 = list(curr), list(prev)
-        bet_nums = logic.tim_chu_so_bet(d1, d2, "Thẳng")
+        # ============ BẢNG TEST NGƯỢC (BACKTEST) ============
+        st.markdown("---")
+        st.subheader("📊 Bảng Test Ngược 10 Ngày (Backtest)")
+        st.caption(f"Mỗi ngày tính lại mức số với ô rỗng TT≥{empty_tt}, ĐT≥{empty_dt}")
         
-        if bet_nums:
-             bet_data.append({
-                 "Ngày": shorten_date(df_show.iloc[i]['date']),
-                 "Hôm nay": curr,
-                 "Hôm qua": prev,
-                 "Số Bệt": ",".join(bet_nums)
-             })
-    
-    if bet_data:
-        st.dataframe(pd.DataFrame(bet_data), use_container_width=True)
-    else:
-        st.info("Không tìm thấy cầu bệt trong phạm vi hiển thị.")
-
-# ------------------------------------------------------------------------------
-# TAB 4: THỐNG KÊ
-# ------------------------------------------------------------------------------
-with tabs[3]:
-    st.caption("Thống Kê Top Lâu Ra & Tạo Mẫu Copy")
-    l2_src = st.radio("Nguồn:", ["GĐB", "G1"], horizontal=True, key="l2_src_radio")
-    dat_l2 = full_xsmb if l2_src == "GĐB" else full_g1
-    all_tails = [x['number'][-2:] for x in dat_l2]
-
-    def find_top_gan(data_list, extract_func, label, get_dan_func):
-        last_seen = {}
-        for idx, val in enumerate(data_list):
-            k = extract_func(val)
-            if k not in last_seen: last_seen[k] = idx
-        if not last_seen: return None
-        top_val = max(last_seen, key=last_seen.get)
-        return {
-            "Loại": label, "Giá trị": top_val, "Số ngày": last_seen[top_val],
-            "Chữ": logic.doc_so_chu(last_seen[top_val]), "Dàn": get_dan_func(top_val)
-        }
-
-    stats = []
-    stats.append(find_top_gan(all_tails, logic.bo, "Bộ", logic.get_bo_dan))
-    stats.append(find_top_gan(all_tails, lambda x: x[0], "Đầu", logic.get_dau_dan))
-    stats.append(find_top_gan(all_tails, lambda x: x[1], "Đuôi", logic.get_duoi_dan))
-    stats.append(find_top_gan(all_tails, lambda x: str((int(x[0])+int(x[1]))%10), "Tổng", logic.get_tong_dan))
-    stats.append(find_top_gan(all_tails, logic.hieu, "Hiệu", logic.get_hieu_dan))
-    stats.append(find_top_gan(all_tails, logic.zodiac, "Con Giáp", logic.get_zodiac_dan))
-    stats.append(find_top_gan(all_tails, logic.kep, "Kép", logic.get_kep_dan))
-
-    c_text, c_table = st.columns([1, 1])
-    with c_text:
-        st.info("📝 Mẫu văn bản (Copy)")
-        txt_out = f"==== TOP GAN {l2_src} ({shorten_date(dt_show[0]['date'])}) ====\n\n"
-        for item in stats:
-            if item:
-                val_txt = logic.doc_so_chu(item['Giá trị']) if str(item['Giá trị']).isdigit() else str(item['Giá trị'])
-                txt_out += f"{item['Loại']}: {val_txt}\nDàn: {item['Dàn']}\nLâu ra: {item['Chữ']} ngày\n---\n"
-        txt_out += "#xoso #thongke\n⛔ Chỉ mang tính chất tham khảo!"
-        st.text_area("Nội dung:", txt_out, height=500)
-
-    with c_table:
-        st.success("🏆 Bảng Gan Tổng Hợp")
-        df_stats = pd.DataFrame([s for s in stats if s])
-        if not df_stats.empty:
-            st.dataframe(df_stats[["Loại", "Giá trị", "Số ngày", "Dàn"]], hide_index=True, use_container_width=True)
+        # Helper function tính mức số cho một offset cụ thể
+        def calculate_muc_for_offset(back_offset, result_type_calc):
+            # Lấy dữ liệu tại thời điểm lùi back_offset ngày
+            local_dt_slice = dien_toan_data[back_offset:back_offset + NUM_DAYS]
+            local_tt_slice = than_tai_data[back_offset:back_offset + NUM_DAYS]
+            local_xsmb_slice = xsmb_data[back_offset:back_offset + NUM_DAYS]
+            local_g1_slice = giai_nhat_data[back_offset:back_offset + NUM_DAYS] if giai_nhat_data else []
+            
+            if result_type_calc == "TT":
+                local_results = [item["number"] for item in local_tt_slice]
+                threshold = empty_tt
+            else:
+                local_results = ["".join(item["numbers"]) for item in local_dt_slice]
+                threshold = empty_dt
+            
+            # Tính dàn lâu ra với auto-reduce
+            local_lau_ra, _ = get_lau_ra_with_auto_reduce(
+                local_results, local_xsmb_slice, local_g1_slice, 
+                compare_source, threshold, local_dt_slice
+            )
+            
+            if not local_lau_ra:
+                return []
+            
+            # Tính mức số
+            dan_list = [dan for _, dan in local_lau_ra]
+            muc_results = []
+            for level in range(len(dan_list) + 1):
+                pairs = jn(dan_list, level)
+                if pairs:
+                    pairs_list = pairs.split(",")
+                    muc_results.append({
+                        "level": level,
+                        "pairs_set": set(pairs_list)
+                    })
+            return muc_results
         
-        st.markdown("#### ☠️ Top 10 Số Đề Gan")
-        last_seen_num = {}
-        for idx, val in enumerate(all_tails):
-            if val not in last_seen_num: last_seen_num[val] = idx
-        gan_nums = [{"Số": k, "Gan": v} for k,v in last_seen_num.items()]
-        df_gan_nums = pd.DataFrame(gan_nums).sort_values("Gan", ascending=False).head(10)
-        st.dataframe(df_gan_nums.T, use_container_width=True)
-    
-    # === MỨC SỐ CỦA CÁC DÀN GAN ===
-    st.divider()
-    st.markdown("### 📊 Mức Số của các Dàn Gan")
-    st.caption("Phân tích tần suất xuất hiện của các số trong tất cả các dàn gan")
-    
-    # Thu thập tất cả các số từ các dàn gan
-    from collections import defaultdict
-    number_frequency = defaultdict(int)
-    
-    # Duyệt qua tất cả các dàn gan và đếm tần suất
-    for item in stats:
-        if item and item['Dàn']:
-            # Parse dàn (có thể là dạng "12,34,56" hoặc "12 34 56")
-            dan_str = str(item['Dàn'])
-            # Tách các số (dùng cả dấu phấy và khoảng trắng)
-            numbers = dan_str.replace(',', ' ').split()
-            for num in numbers:
-                num = num.strip()
-                if num and len(num) == 2 and num.isdigit():
-                    number_frequency[num] += 1
-    
-    # Nhóm theo mức (bao gồm mức 0)
-    level_groups = defaultdict(list)
-    for num, freq in number_frequency.items():
-        level_groups[freq].append(num)
-    
-    # Tìm tất cả số từ 00-99 và thêm mức 0
-    all_possible_numbers = {f"{i:02d}" for i in range(100)}
-    numbers_in_gan = set(number_frequency.keys())
-    level_0_numbers = sorted(all_possible_numbers - numbers_in_gan)
-    
-    if level_0_numbers:
-        level_groups[0] = level_0_numbers
-    
-    # Hiển thị theo mức giảm dần
-    col_muc1, col_muc2 = st.columns([1, 3])
-    
-    with col_muc1:
-        st.info("📈 Thống kê tổng quan")
-        st.metric("Tổng số dàn gan", len([s for s in stats if s]))
-        st.metric("Số unique trong dàn", len(number_frequency))
-        st.metric("Số hoàn toàn không có", len(level_0_numbers))
-        max_level = max(level_groups.keys()) if level_groups else 0
-        st.metric("Mức cao nhất", max_level)
-    
-    with col_muc2:
-        st.success("🎯 Bảng Mức Số")
+        # Tính backtest - bắt đầu từ offset hiện tại
+        backtest_rows = []
+        base_label = "" if offset == 0 else f"Lùi {offset}+"
         
-        # Tạo bảng hiển thị đẹp hơn
-        muc_data = []
-        for freq in sorted(level_groups.keys(), reverse=True):
-            nums = sorted(level_groups[freq])
-            nums_display = ', '.join(nums)
-            muc_data.append({
-                "Mức": freq,
-                "Số lượng": len(nums),
-                "Các số": nums_display
+        for i in range(1, 11):  # Test 10 ngày ngược từ vị trí hiện tại
+            actual_offset = offset + i  # Offset thực tế = offset sidebar + i
+            
+            # Tính mức số tại thời điểm actual_offset
+            muc_tt_at_i = calculate_muc_for_offset(actual_offset, "TT")
+            muc_dt_at_i = calculate_muc_for_offset(actual_offset, "DT")
+            
+            # Lấy kết quả ngày trước đó (actual_offset - 1), tức là kết quả mà mức số dự đoán
+            prev_offset = actual_offset - 1
+            if compare_source == "GĐB":
+                result_num = xsmb_data[prev_offset]["number"][-2:].zfill(2) if prev_offset < len(xsmb_data) else "-"
+            else:
+                result_num = giai_nhat_data[prev_offset]["number"][-2:].zfill(2) if prev_offset < len(giai_nhat_data) else "-"
+            
+            result_date = dien_toan_data[prev_offset]["date"] if prev_offset < len(dien_toan_data) else f"N-{prev_offset}"
+            
+            # Tìm mức nào chứa kết quả cho TT
+            hit_muc_tt = "-"
+            for muc in muc_tt_at_i:
+                if result_num in muc["pairs_set"]:
+                    hit_muc_tt = f"M{muc['level']}"
+                    break
+            
+            # Tìm mức nào chứa kết quả cho DT
+            hit_muc_dt = "-"
+            for muc in muc_dt_at_i:
+                if result_num in muc["pairs_set"]:
+                    hit_muc_dt = f"M{muc['level']}"
+                    break
+            
+            backtest_rows.append({
+                "Lùi": f"{base_label}{i}" if base_label else f"Lùi {i}",
+                "Ngày KQ": result_date,
+                f"{compare_source}": result_num,
+                "TT Mức": hit_muc_tt,
+                "ĐT Mức": hit_muc_dt
             })
         
-        df_muc = pd.DataFrame(muc_data)
-        st.dataframe(
-            df_muc,
-            column_config={
-                "Mức": st.column_config.NumberColumn("Mức", width="small"),
-                "Số lượng": st.column_config.NumberColumn("Số lượng", width="small"),
-                "Các số": st.column_config.TextColumn("Các số", width="large")
-            },
-            hide_index=True,
-            use_container_width=True,
-            height=400
-        )
-    
-    # Phân tích chi tiết
-    st.divider()
-    st.markdown("#### 🔍 Chi tiết theo mức")
-    
-    # Tạo tabs cho các mức khác nhau
-    levels = sorted(level_groups.keys(), reverse=True)
-    if len(levels) > 0:
-        # Chỉ hiển thị các mức có ý nghĩa (không hiển thị mức 0 nếu quá nhiều)
-        significant_levels = [l for l in levels if l > 0]
-        if 0 in levels and len(level_groups[0]) <= 50:
-            significant_levels.append(0)
+        df_backtest = pd.DataFrame(backtest_rows)
+        st.dataframe(df_backtest, use_container_width=True, height=400)
         
-        # Hiển thị từng mức
-        for freq in significant_levels[:10]:  # Giới hạn 10 mức để tránh quá dài
-            nums = sorted(level_groups[freq])
-            
-            # Định dạng màu sắc dựa trên mức
-            if freq == 0:
-                color_emoji = "⚪"
-                description = "Không xuất hiện trong bất kỳ dàn gan nào"
-            elif freq >= 5:
-                color_emoji = "🔴"
-                description = "Xuất hiện rất nhiều - Ưu tiên cao"
-            elif freq >= 3:
-                color_emoji = "🟠"
-                description = "Xuất hiện nhiều - Cần chú ý"
-            elif freq >= 2:
-                color_emoji = "🟡"
-                description = "Xuất hiện trung bình"
-            else:
-                color_emoji = "🟢"
-                description = "Xuất hiện ít"
-            
-            with st.expander(f"{color_emoji} **Mức {freq}** ({len(nums)} số) - {description}", expanded=(freq > 0 and freq >= 3)):
-                st.write(f"**Danh sách:** {', '.join(nums)}")
-
-# --- TAB 5: DÒ CẦU ---
-with tabs[4]:
-    st.caption("Công Cụ Dò Cầu")
-    target = st.text_input("Nhập cặp số (VD: 68):", max_chars=2)
-    if target and len(target) == 2:
-        found = []
-        for x in full_xsmb[:days_fetch]:
-            if target in x['number']: found.append({"Ngày": shorten_date(x['date']), "Nguồn": "GĐB", "Số": x['number']})
-        for x in full_g1[:days_fetch]:
-            if target in x['number']: found.append({"Ngày": shorten_date(x['date']), "Nguồn": "G1", "Số": x['number']})
-        if found:
-            st.success(f"Tìm thấy {len(found)} lần.")
-            st.dataframe(pd.DataFrame(found), use_container_width=True, hide_index=True)
-        else:
-            st.warning("Không tìm thấy.")
-
-# ------------------------------------------------------------------------------
-# TAB 6: TẦN SUẤT (ĐIỆN TOÁN - KHUNG 7 NGÀY)
-# ------------------------------------------------------------------------------
-with tabs[5]:
-    st.caption("Phân Tích Tần Suất Lô Tô (Khung 7 Ngày)")
-    
-    # Thêm lựa chọn nguồn dữ liệu
-    freq_source = st.radio("Nguồn dữ liệu:", ["Cả 2 (ĐT + TT)", "Chỉ Điện Toán", "Chỉ Thần Tài"], horizontal=True, key="freq_source", index=1)
-    
-    if len(dt_show) < 7:
-        st.warning("Cần ít nhất 7 ngày dữ liệu để tính tần suất.")
-    else:
-        # 1. TẦN SUẤT 0-9 (TOP 3)
-        st.markdown("##### 1. Tần suất chữ số 0-9")
-        freq_rows_digits = []
+        # Thống kê hit rate
+        st.markdown("### 📈 Thống Kê Hit Rate")
         
-        for i in range(len(dt_show) - 6):
-            current_day = dt_show[i]
-            date_str = shorten_date(current_day['date'])
-            kq_dt = "".join(current_day['numbers'])
-            
-            # Lấy kết quả ĐB và TT từ df_show
-            xsmb_db = df_show.iloc[i].get('xsmb_full', '')
-            tt_num = str(df_show.iloc[i].get('tt_number', ''))
-            
-            # Tạo cột hiển thị dựa trên lựa chọn
-            if freq_source == "Cả 2 (ĐT + TT)":
-                display_val = kq_dt + tt_num if tt_num and tt_num != 'nan' else kq_dt
-            elif freq_source == "Chỉ Điện Toán":
-                display_val = kq_dt
-            else:  # Chỉ Thần Tài
-                display_val = tt_num if tt_num and tt_num != 'nan' else ""
-            
-            # Nối dữ liệu trong khung 7 ngày dựa trên lựa chọn
-            window_7_days = dt_show[i : i+7]
-            merged_str = ""
-            for idx, day in enumerate(window_7_days):
-                if freq_source in ["Cả 2 (ĐT + TT)", "Chỉ Điện Toán"]:
-                    merged_str += "".join(day['numbers'])  # Điện Toán
-                if freq_source in ["Cả 2 (ĐT + TT)", "Chỉ Thần Tài"]:
-                    tt_val = str(df_show.iloc[i + idx].get('tt_number', ''))
-                    if tt_val and tt_val != 'nan':
-                        merged_str += tt_val  # Thần Tài
-            
-            counts_map = {str(d): merged_str.count(str(d)) for d in range(10)}
-            
-            freq_groups = {}
-            for digit, count in counts_map.items():
-                freq_groups.setdefault(count, []).append(digit)
-            
-            row = {"STT": i + 1, "Ngày": date_str, "KQ": display_val, "KQ (ĐB)": str(xsmb_db)}
-            sorted_freqs = sorted(freq_groups.keys(), reverse=True)
-            top_3 = sorted_freqs[:3]
-            disp_grps = []
-            for f in top_3:
-                disp_grps.append("".join(sorted(freq_groups[f])))
-            row["TOP 3"] = " ".join(disp_grps)
-            
-            for f in range(16): 
-                row[str(f)] = ",".join(sorted(freq_groups.get(f, [])))
-            freq_rows_digits.append(row)
-
-        df_digits = pd.DataFrame(freq_rows_digits)
-        # Lọc bỏ các cột tần suất rỗng
-        freq_cols = [str(f) for f in range(16) if str(f) in df_digits.columns]
-        non_empty_freq_cols = [col for col in freq_cols if df_digits[col].str.strip().any()]
-        cols = ["STT", "Ngày", "KQ", "KQ (ĐB)"] + non_empty_freq_cols + ["TOP 3"]
-        df_digits = df_digits[cols]
-
-        col_cfg_digits = {
-            "STT": st.column_config.NumberColumn("STT", width=30, help="Số thứ tự"),
-            "Ngày": st.column_config.TextColumn("Ngày", width=50),
-            "KQ": st.column_config.TextColumn("KQ", width=120, help="Kết quả theo nguồn đã chọn"),
-            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=100, help="Kết quả Đặc Biệt"),
-            "TOP 3": st.column_config.TextColumn("TOP 3 (0-9)", width=100),
-        }
-        for f in range(16):
-            if str(f) in df_digits.columns:
-                col_cfg_digits[str(f)] = st.column_config.TextColumn(str(f), width=60)
-
-        def highlight_cols_digits(row):
-            styles = []
-            for col in row.index:
-                val = row[col]
-                if col == "TOP 3":
-                    styles.append('background-color: #ffffcc; color: #d63031; font-weight: bold; border-left: 2px solid #ccc;')
-                    continue
-                if col in ["STT", "Ngày", "KQ", "KQ (ĐB)"]: styles.append(""); continue
-                try:
-                    freq = int(col)
-                    if not val: styles.append("")
-                    elif freq == 0: styles.append('color: #808080; font-style: italic;')
-                    elif freq >= 8: styles.append('background-color: #ff4b4b; color: #ffffff; font-weight: bold;')
-                    elif freq >= 5: styles.append('background-color: #ffcccc; color: #000000; font-weight: bold;')
-                    else: styles.append('')
-                except: styles.append("")
-            return styles
-
-        st.dataframe(df_digits.style.apply(highlight_cols_digits, axis=1), column_config=col_cfg_digits, hide_index=True, use_container_width=True)
-
-        st.divider()
-
-        # 2. TẦN SUẤT 00-99 (TOP 2)
-        st.markdown("##### 2. Tần suất cặp số 00-99")
+        col_stat1, col_stat2 = st.columns(2)
         
-        freq_rows_pairs = []
-        for i in range(len(dt_show) - 6):
-            current_day = dt_show[i]
-            date_str = shorten_date(current_day['date'])
-            kq_dt = "".join(current_day['numbers'])
+        with col_stat1:
+            st.markdown("**🌟 Thần Tài:**")
+            tt_hits = [r["TT Mức"] for r in backtest_rows if r["TT Mức"] != "-"]
+            tt_hit_rate = len(tt_hits) / len(backtest_rows) * 100 if backtest_rows else 0
+            st.metric("Hit Rate", f"{tt_hit_rate:.0f}%", f"{len(tt_hits)}/10")
             
-            # Lấy kết quả ĐB và TT từ df_show
-            xsmb_db = df_show.iloc[i].get('xsmb_full', '')
-            tt_num = str(df_show.iloc[i].get('tt_number', ''))
+            from collections import Counter
+            tt_counter = Counter(tt_hits)
+            for muc, count in sorted(tt_counter.items()):
+                st.caption(f"{muc}: {count} lần")
+        
+        with col_stat2:
+            st.markdown("**🎰 Điện Toán:**")
+            dt_hits = [r["ĐT Mức"] for r in backtest_rows if r["ĐT Mức"] != "-"]
+            dt_hit_rate = len(dt_hits) / len(backtest_rows) * 100 if backtest_rows else 0
+            st.metric("Hit Rate", f"{dt_hit_rate:.0f}%", f"{len(dt_hits)}/10")
             
-            # Tạo cột hiển thị dựa trên lựa chọn
-            if freq_source == "Cả 2 (ĐT + TT)":
-                display_val = kq_dt + tt_num if tt_num and tt_num != 'nan' else kq_dt
-            elif freq_source == "Chỉ Điện Toán":
-                display_val = kq_dt
-            else:  # Chỉ Thần Tài
-                display_val = tt_num if tt_num and tt_num != 'nan' else ""
-            
-            # Nối dữ liệu trong khung 7 ngày dựa trên lựa chọn
-            window_7_days = dt_show[i : i+7]
-            merged_str = ""
-            for idx, day in enumerate(window_7_days):
-                if freq_source in ["Cả 2 (ĐT + TT)", "Chỉ Điện Toán"]:
-                    merged_str += "".join(day['numbers'])  # Điện Toán
-                if freq_source in ["Cả 2 (ĐT + TT)", "Chỉ Thần Tài"]:
-                    tt_val = str(df_show.iloc[i + idx].get('tt_number', ''))
-                    if tt_val and tt_val != 'nan':
-                        merged_str += tt_val  # Thần Tài
-            
-            counts_map = {}
-            for num in range(100):
-                pair = f"{num:02d}"
-                counts_map[pair] = merged_str.count(pair)
-            
-            freq_groups = {}
-            max_freq = 0
-            for pair, count in counts_map.items():
-                freq_groups.setdefault(count, []).append(pair)
-                if count > max_freq: max_freq = count
-            
-            row = {"STT": i + 1, "Ngày": date_str, "KQ": display_val, "KQ (ĐB)": str(xsmb_db)}
-            sorted_freqs = sorted(freq_groups.keys(), reverse=True)
-            top_2 = sorted_freqs[:2]
-            disp_grps = []
-            for f in top_2:
-                disp_grps.append(",".join(sorted(freq_groups[f])))
-            row["TOP 2"] = " | ".join(disp_grps)
-            
-            limit_col = max(8, max_freq + 1)
-            for f in range(limit_col): 
-                pairs = freq_groups.get(f, [])
-                row[str(f)] = " ".join(sorted(pairs))
-            freq_rows_pairs.append(row)
+            dt_counter = Counter(dt_hits)
+            for muc, count in sorted(dt_counter.items()):
+                st.caption(f"{muc}: {count} lần")
 
-        df_pairs = pd.DataFrame(freq_rows_pairs)
-        # Lọc bỏ các cột tần suất rỗng
-        freq_cols_p = [str(f) for f in range(limit_col) if str(f) in df_pairs.columns]
-        non_empty_freq_cols_p = [col for col in freq_cols_p if df_pairs[col].str.strip().any()]
-        cols_p = ["STT", "Ngày", "KQ", "KQ (ĐB)"] + non_empty_freq_cols_p + ["TOP 2"]
-        df_pairs = df_pairs[cols_p]
+# ============ TAB 4: THỐNG KÊ ĐB/G1 ============
+with tab4:
+    st.subheader("📊 Thống Kê Giải Đặc Biệt / Giải Nhất")
+    
+    source_data = xsmb_data if compare_source == "GĐB" else giai_nhat_data
+    
+    if source_data:
+        last2 = [item["number"][-2:].zfill(2) for item in source_data[:100]]
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("### 🎯 Bộ Số")
+            bo_lau_ra = {}
+            for b in set(bo(n) for n in last2):
+                idx = next((i for i, n in enumerate(last2) if bo(n) == b), -1)
+                bo_lau_ra[b] = idx
+            
+            bo_sorted = sorted(bo_lau_ra.items(), key=lambda x: x[1], reverse=True)
+            for b, lag in bo_sorted[:5]:
+                st.markdown(f"**Bộ {b}**: Lâu ra {lag} ngày")
+                st.caption(f"Dàn: {get_bo_dan(b)}")
+        
+        with col2:
+            st.markdown("### 🔢 Tổng")
+            tong_lau_ra = {}
+            for t in range(10):
+                idx = next((i for i, n in enumerate(last2) if (int(n[0]) + int(n[1])) % 10 == t), -1)
+                tong_lau_ra[t] = idx
+            
+            tong_sorted = sorted(tong_lau_ra.items(), key=lambda x: x[1], reverse=True)
+            for t, lag in tong_sorted[:5]:
+                st.markdown(f"**Tổng {t}**: Lâu ra {lag} ngày")
+                st.caption(f"Dàn: {get_tong_dan(t)}")
+        
+        with col3:
+            st.markdown("### 🐲 Con Giáp")
+            zodiac_lau_ra = {}
+            for z in set(zodiac(n) for n in last2):
+                idx = next((i for i, n in enumerate(last2) if zodiac(n) == z), -1)
+                zodiac_lau_ra[z] = idx
+            
+            zodiac_sorted = sorted(zodiac_lau_ra.items(), key=lambda x: x[1], reverse=True)
+            for z, lag in zodiac_sorted[:5]:
+                st.markdown(f"**{z}**: Lâu ra {lag} ngày")
+                st.caption(f"Dàn: {get_zodiac_dan(z)}")
+        
+        st.markdown("---")
+        
+        col4, col5 = st.columns(2)
+        
+        with col4:
+            st.markdown("### ➗ Hiệu")
+            hieu_lau_ra = {}
+            for h in range(10):
+                idx = next((i for i, n in enumerate(last2) if hieu(n) == h), -1)
+                hieu_lau_ra[h] = idx
+            
+            hieu_sorted = sorted(hieu_lau_ra.items(), key=lambda x: x[1], reverse=True)
+            for h, lag in hieu_sorted[:5]:
+                st.markdown(f"**Hiệu {h}**: Lâu ra {lag} ngày")
+                st.caption(f"Dàn: {get_hieu_dan(h)}")
+        
+        with col5:
+            st.markdown("### 👯 Kép")
+            kep_lau_ra = {}
+            for k in set(kep(n) for n in last2):
+                idx = next((i for i, n in enumerate(last2) if kep(n) == k), -1)
+                kep_lau_ra[k] = idx
+            
+            kep_sorted = sorted(kep_lau_ra.items(), key=lambda x: x[1], reverse=True)
+            for k, lag in kep_sorted:
+                if lag > 0:
+                    st.markdown(f"**{k}**: Lâu ra {lag} ngày")
 
-        col_cfg_pairs = {
-            "STT": st.column_config.NumberColumn("STT", width=50, help="Số thứ tự"),
-            "Ngày": st.column_config.TextColumn("Ngày", width=80),
-            "KQ": st.column_config.TextColumn("KQ", width=150, help="Kết quả theo nguồn đã chọn"),
-            "KQ (ĐB)": st.column_config.TextColumn("KQ (ĐB)", width=80, help="Kết quả Đặc Biệt"),
-            "TOP 2": st.column_config.TextColumn("TOP 2 (Cao nhất)", width=200),
-        }
-        for f in range(limit_col):
-            if str(f) in df_pairs.columns:
-                col_cfg_pairs[str(f)] = st.column_config.TextColumn(str(f), width=80)
+# ============ TAB 5: HƯỚNG DẪN ============
+with tab5:
+    st.subheader("ℹ️ Hướng Dẫn Sử Dụng")
+    
+    st.markdown("""
+    ### 📱 Giới thiệu
+    **SIÊU GÀ APP** là ứng dụng phân tích xổ số Miền Bắc, hỗ trợ:
+    - Xem kết quả Điện Toán 123, Thần Tài, Giải ĐB, Giải Nhất
+    - Tính toán Dàn Nuôi theo phương pháp Nhị Hợp
+    - Thống kê Mức Số, Lâu Ra
+    - Phân tích Bộ, Tổng, Hiệu, Kép, Con Giáp
+    
+    ### 🎮 Cách sử dụng
+    1. **Chọn chế độ hiển thị**: Xem dữ liệu hiện tại hoặc lùi 1-9 ngày
+    2. **Chọn nguồn so sánh**: GĐB hoặc Giải Nhất
+    3. **Chọn loại kết quả**: Thần Tài hoặc Điện Toán
+    4. **Xem các tab**: Kết Quả XS, Dàn Nuôi, Mức Số, Thống Kê
+    
+    ### ⚠️ Lưu ý
+    - Đây là ứng dụng **THỐNG KÊ** tham khảo
+    - **KHÔNG** khuyến khích cá cược
+    - Dữ liệu được cache 1 giờ, refresh trang để cập nhật
+    
+    ### 👨‍💻 Tác giả
+    © TRUNGND2025
+    """)
 
-        def highlight_cols_pairs(row):
-            styles = []
-            for col in row.index:
-                val = row[col]
-                if col == "TOP 2":
-                    styles.append('background-color: #e6f7ff; color: #0050b3; font-weight: bold; border-left: 2px solid #ccc;')
-                    continue
-                if col in ["STT", "Ngày", "KQ", "KQ (ĐB)"]: styles.append(""); continue
-                try:
-                    freq = int(col)
-                    if not val: styles.append("")
-                    elif freq == 0: styles.append('color: #808080; font-style: italic;')
-                    elif freq >= 4: styles.append('background-color: #ff4b4b; color: #ffffff; font-weight: bold;')
-                    elif freq >= 2: styles.append('background-color: #ffcccc; color: #000000; font-weight: bold;')
-                    else: styles.append('')
-                except: styles.append("")
-            return styles
-
-        st.dataframe(df_pairs.style.apply(highlight_cols_pairs, axis=1), column_config=col_cfg_pairs, hide_index=True, use_container_width=True)
-
-
+# Footer
+st.markdown("---")
+st.caption("📊 Dữ liệu thống kê tham khảo - Không khuyến khích cá cược | © TRUNGND2025")
